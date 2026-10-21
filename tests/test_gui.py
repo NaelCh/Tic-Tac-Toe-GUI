@@ -95,6 +95,61 @@ class DesktopTests(unittest.TestCase):
         self.assertIsNone(self.app.pending)
         self.assertTrue(any(str(b['state']) == 'normal' for b in self.app.buttons.values()))
 
+    def test_sidebar_selects_difficulty_and_remembers_it(self):
+        self.app.mode_buttons[MODES[3]].invoke()
+        self.assertEqual(self.app.active_mode, MODES[3])
+        self.assertTrue(self.app.computer_button.selected)
+        self.assertTrue(self.app.mode_buttons[MODES[3]].selected)
+        self.app.local_button.invoke()
+        self.assertEqual(self.app.active_mode, MODES[0])
+        self.app.computer_button.invoke()
+        self.assertEqual(self.app.active_mode, MODES[3])
+
+    def test_actual_mouse_and_keyboard_input(self):
+        first = self.app.buttons[0]
+        first.event_generate('<Button-1>', x=30, y=30)
+        self.app.update()
+        self.assertEqual(self.app.match.board[0], 'X')
+        first.event_generate('<Button-1>', x=30, y=30)
+        self.assertEqual(self.app.match.turn, 'O')
+        second = self.app.buttons[1]
+        second.focus_force()
+        self.app.update()
+        second.event_generate('<KeyPress-space>')
+        self.app.update()
+        self.assertEqual(self.app.match.board[1], 'O')
+        self.app.event_generate('<KeyPress-3>')
+        self.app.update()
+        self.assertEqual(self.app.match.board[2], 'X')
+
+    def test_small_window_preserves_playable_board_and_controls(self):
+        self.app.geometry('860x660')
+        self.app.update()
+        for widget in (*self.app.buttons.values(), self.app.next_button):
+            self.assertGreater(widget.winfo_height(), 40)
+            self.assertGreater(widget.winfo_width(), 40)
+            self.assertLessEqual(widget.winfo_rooty()+widget.winfo_height(),
+                                 self.app.winfo_rooty()+self.app.winfo_height())
+
+    def test_winning_tiles_highlight_and_reset(self):
+        for cell in (0, 3, 1, 4, 2):
+            self.app.buttons[cell].invoke()
+        self.assertEqual([i for i, button in self.app.buttons.items() if button.winning],
+                         [0, 1, 2])
+        self.app.next_round()
+        self.assertFalse(any(button.winning for button in self.app.buttons.values()))
+
+    def test_help_opens_and_closes_with_escape(self):
+        self.app.show_help()
+        self.app.update()
+        popup = next(widget for widget in self.app.winfo_children()
+                     if widget.winfo_class() == 'Toplevel')
+        popup.focus_force()
+        self.app.update()
+        popup.event_generate('<KeyPress-Escape>')
+        self.app.update()
+        self.assertFalse(popup.winfo_exists())
+
 
 if __name__ == '__main__':
     unittest.main()

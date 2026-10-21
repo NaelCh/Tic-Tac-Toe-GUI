@@ -60,9 +60,10 @@ def best_move(board, turn):
 def choose_move(board, turn, difficulty, rng=None):
     """Choose a legal move without changing the board.
 
-    Medium sees immediate wins and threats. Hard adds perfect play on 85% of
-    non-forced decisions, leaving occasional openings for a human to exploit.
-    Neither intermediate level ever deliberately misses a one-move win/block.
+    Both intermediate levels take immediate wins. Medium notices immediate
+    threats 65% of the time; hard notices 88% and plays optimally on 60% of
+    non-forced decisions. Otherwise they choose any legal move, so an overlooked
+    threat can still be blocked by chance rather than forcing a loss.
     ``rng`` can be a seeded Random instance for reproducible games and tests.
     """
     if difficulty not in ('easy', 'medium', 'hard', 'unbeatable'):
@@ -76,12 +77,17 @@ def choose_move(board, turn, difficulty, rng=None):
     if difficulty == 'easy':
         return rng.choice(legal)
     other = 'O' if turn == 'X' else 'X'
-    for player in (turn, other):
-        for cell in legal:
-            candidate = list(board)
-            candidate[cell] = player
-            if result(candidate) == player:
-                return cell
-    if difficulty == 'hard' and rng.random() < .85:
+    for cell in legal:
+        candidate = list(board)
+        candidate[cell] = turn
+        if result(candidate) == turn:
+            return cell
+    for cell in legal:
+        candidate = list(board)
+        candidate[cell] = other
+        if result(candidate) == other:
+            block_probability = .65 if difficulty == 'medium' else .88
+            return cell if rng.random() < block_probability else rng.choice(legal)
+    if difficulty == 'hard' and rng.random() < .60:
         return best_move(board, turn)
     return rng.choice(legal)

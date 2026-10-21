@@ -1,120 +1,174 @@
-"""Greek desktop Tic Tac Toe. No third-party runtime dependencies."""
+"""Greek desktop Tic Tac Toe with a custom, dependency-free interface."""
+import sys
 import tkinter as tk
-from tkinter import messagebox, ttk
-from engine import Match, choose_move, winning_line
+from tkinter import font as tkfont, messagebox
 
-BG, INK, MUTED, GREEN, WHITE = '#f4f2ec', '#203731', '#64756c', '#18755b', '#ffffff'
+from engine import Match, choose_move, winning_line
+from ui import ActionButton, BoardCell, ScoreCard, rounded, BG, PANEL, TEXT, MUTED, TEAL, CORAL, PURPLE
+
 MODES = ('Δύο παίκτες', 'Υπολογιστής · εύκολο', 'Υπολογιστής · μέτριο',
          'Υπολογιστής · δύσκολο', 'Υπολογιστής · αήττητο')
 DIFFICULTIES = dict(zip(MODES[1:], ('easy', 'medium', 'hard', 'unbeatable')))
+DETAILS = (
+    'Μοιραστείτε το ίδιο ταμπλό.\nΟ επόμενος γύρος αλλάζει τον πρώτο παίκτη.',
+    'Για μια χαλαρή αρχή.\nΟ υπολογιστής παίζει τυχαία.',
+    'Λίγη σκέψη, αρκετές ευκαιρίες.\nΒλέπει απειλές, αλλά του ξεφεύγουν μερικές.',
+    'Μια καλή πρόκληση, με περιθώρια νίκης.\nΣτήσε την παγίδα σου και περίμενε την ευκαιρία.',
+    'Η απόλυτη δοκιμασία.\nΠαίξε τέλεια για να πετύχεις ισοπαλία.',
+)
 
 
 class TicTacToe(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('Τρίλιζα | Μια κίνηση ακόμα')
-        self.geometry('560x960')
-        self.minsize(520, 850)
+        height = min(800, max(660, self.winfo_screenheight()-70))
+        self.geometry(f'1040x{height}')
+        self.minsize(860, 660)
         self.configure(bg=BG)
+        families = set(tkfont.families(self))
+        candidates = ('Segoe UI', 'Helvetica Neue', 'DejaVu Sans')
+        self.family = next((name for name in candidates if name in families), 'TkDefaultFont')
         self.match = Match()
         self.scores = {'X': 0, 'O': 0, 'draw': 0}
         self.round_number, self.starter, self.pending = 1, 'X', None
         self.mode = tk.StringVar(value=MODES[0])
-        self.active_mode = MODES[0]
-        self.status, self.subtitle = tk.StringVar(), tk.StringVar()
-        self.score_text, self.buttons = {}, {}
+        self.active_mode, self.last_computer_mode = MODES[0], MODES[2]
+        self.status, self.subtitle, self.detail = tk.StringVar(), tk.StringVar(), tk.StringVar()
+        self.round_text = tk.StringVar()
+        self.buttons, self.score_cards, self.mode_buttons = {}, {}, {}
         self._build_ui()
         self._render()
         self.bind('<Control-n>', lambda event: self.next_round())
+        if sys.platform == 'darwin':
+            self.bind('<Command-n>', lambda event: self.next_round())
         self.bind('<F1>', lambda event: self.show_help())
         self.bind('<KeyPress>', self._key_move)
         self.protocol('WM_DELETE_WINDOW', self.close)
+
+    def label(self, parent, text=None, *, size=11, color=TEXT, bold=False,
+              background=BG, **kwargs):
+        return tk.Label(parent, text=text, bg=background, fg=color,
+                        font=(self.family, size, 'bold' if bold else 'normal'), **kwargs)
 
     @property
     def computer_turn(self):
         return self.active_mode != MODES[0] and self.match.turn == 'O'
 
-    def _label(self, parent, text):
-        return tk.Label(parent, text=text, bg=BG, fg=INK, font=('DejaVu Sans', 10))
-
     def _build_ui(self):
-        style = ttk.Style(self)
-        style.theme_use('clam')
-        style.configure('TCombobox', padding=8)
-        outer = tk.Frame(self, bg=BG, padx=28, pady=22)
-        outer.pack(fill='both', expand=True)
-        self._label(outer, 'ΠΑΙΞΕ • ΣΚΕΨΟΥ • ΞΑΝΑΠΑΙΞΕ').pack(anchor='w')
-        tk.Label(outer, text='Τρίλιζα', bg=BG, fg=INK,
-                 font=('DejaVu Sans', 32, 'bold')).pack(anchor='w', pady=(5,0))
-        self._label(outer, 'Ένα μικρό παιχνίδι. Μια καλή αναμέτρηση.').pack(anchor='w', pady=(0,18))
-        row = tk.Frame(outer, bg=BG)
-        row.pack(fill='x')
-        self._label(row, 'Τρόπος παιχνιδιού').pack(side='left')
-        tk.Button(row, text='Πώς παίζεται;', command=self.show_help, bg=BG,
-                  fg=GREEN, relief='flat', cursor='hand2').pack(side='right')
-        selector = ttk.Combobox(outer, textvariable=self.mode, values=MODES, state='readonly', font=('DejaVu Sans',11))
-        selector.pack(fill='x', pady=(7,16))
-        selector.bind('<<ComboboxSelected>>', self.change_mode)
-        scores = tk.Frame(outer, bg=BG)
+        sidebar = tk.Frame(self, bg=PANEL, width=276, padx=22, pady=26)
+        sidebar.pack(side='left', fill='y')
+        sidebar.pack_propagate(False)
+        brand = tk.Frame(sidebar, bg=PANEL)
+        brand.pack(fill='x', pady=(0, 25))
+        logo = tk.Canvas(brand, bg=PANEL, width=42, height=42, highlightthickness=0)
+        logo.pack(side='left', padx=(0, 10))
+        rounded(logo, 0, 0, 42, 42, 12, fill='#2d3451', outline='')
+        logo.create_line(10, 10, 21, 21, fill=TEAL, width=3, capstyle='round')
+        logo.create_line(21, 10, 10, 21, fill=TEAL, width=3, capstyle='round')
+        logo.create_oval(23, 24, 34, 35, outline=CORAL, width=3)
+        self.label(brand, 'Τρίλιζα', size=23, bold=True, background=PANEL).pack(side='left')
+        self.label(sidebar, 'ΤΟ ΔΙΚΟ ΣΟΥ ΜΙΚΡΟ ΔΙΑΛΕΙΜΜΑ', size=8, color=MUTED,
+                   background=PANEL).pack(anchor='w', pady=(0, 22))
+        self.label(sidebar, 'Αντίπαλος', size=10, color=MUTED,
+                   background=PANEL).pack(anchor='w', pady=(0, 9))
+        self.local_button = ActionButton(sidebar, 'Με έναν φίλο', lambda: self.select_mode(MODES[0]),
+                                         font=(self.family, 11), background=PANEL)
+        self.local_button.pack(fill='x', pady=(0, 7))
+        self.computer_button = ActionButton(sidebar, 'Με υπολογιστή', self.select_computer,
+                                            font=(self.family, 11), background=PANEL)
+        self.computer_button.pack(fill='x')
+        self.label(sidebar, 'Βρες τον ρυθμό σου', size=10, color=MUTED,
+                   background=PANEL).pack(anchor='w', pady=(24, 9))
+        levels = tk.Frame(sidebar, bg=PANEL)
+        levels.pack(fill='x')
+        for column in range(2):
+            levels.columnconfigure(column, weight=1, uniform='level')
+        for index, title in enumerate(('Εύκολο', 'Μέτριο', 'Δύσκολο', 'Αήττητο')):
+            mode = MODES[index+1]
+            button = ActionButton(levels, title, lambda mode=mode: self.select_mode(mode),
+                                  font=(self.family, 10), height=43, background=PANEL)
+            button.grid(row=index//2, column=index%2, sticky='ew',
+                        padx=(0, 4) if index%2 == 0 else (4, 0), pady=4)
+            self.mode_buttons[mode] = button
+        self.label(sidebar, textvariable=self.detail, size=10, color=MUTED,
+                   background=PANEL, justify='left', wraplength=225,
+                   anchor='nw').pack(fill='x', pady=(14, 0))
+        tk.Frame(sidebar, bg=PANEL).pack(fill='both', expand=True)
+        ActionButton(sidebar, 'Πώς παίζεται;   ↗', self.show_help,
+                     font=(self.family, 10), height=40, background=PANEL).pack(fill='x', pady=(12, 7))
+        ActionButton(sidebar, 'Μηδενισμός σκορ', self.reset_session,
+                     font=(self.family, 10), height=40, background=PANEL).pack(fill='x')
+        self.label(sidebar, 'OFFLINE  ·  ΧΩΡΙΣ ΔΙΑΦΗΜΙΣΕΙΣ', size=8, color=MUTED,
+                   background=PANEL).pack(pady=(18, 0))
+
+        main = tk.Frame(self, bg=BG, padx=30, pady=25)
+        main.pack(side='left', fill='both', expand=True)
+        top = tk.Frame(main, bg=BG)
+        top.pack(fill='x')
+        self.label(top, textvariable=self.round_text, size=10, color=PURPLE, bold=True).pack(side='left')
+        self.label(top, 'X + O  /  ΜΙΑ ΚΙΝΗΣΗ ΑΚΟΜΑ', size=9, color=MUTED).pack(side='right')
+        self.label(main, textvariable=self.status, size=23, bold=True).pack(anchor='w', pady=(18, 2))
+        self.label(main, textvariable=self.subtitle, size=10, color=MUTED).pack(anchor='w', pady=(0, 16))
+        scores = tk.Frame(main, bg=BG)
         scores.pack(fill='x')
-        for column, (key,title) in enumerate((('X','ΠΑΙΚΤΗΣ X'), ('draw','ΙΣΟΠΑΛΙΕΣ'), ('O','ΠΑΙΚΤΗΣ O'))):
+        for column, (key, title, color) in enumerate((('X', 'Παίκτης X', TEAL),
+                                                    ('draw', 'Ισοπαλίες', PURPLE),
+                                                    ('O', 'Παίκτης O', CORAL))):
             scores.columnconfigure(column, weight=1, uniform='score')
-            card = tk.Frame(scores, bg=WHITE, padx=6, pady=10)
-            card.grid(row=0, column=column, sticky='ew', padx=3)
-            tk.Label(card, text=title, bg=WHITE, fg=MUTED, font=('DejaVu Sans',9)).pack()
-            self.score_text[key] = tk.StringVar(value='0')
-            tk.Label(card, textvariable=self.score_text[key], bg=WHITE, fg=INK,
-                     font=('DejaVu Sans',22,'bold')).pack()
-        tk.Label(outer, textvariable=self.status, bg=BG, fg=GREEN,
-                 font=('DejaVu Sans',16,'bold')).pack(pady=(17,2))
-        tk.Label(outer, textvariable=self.subtitle, bg=BG, fg=MUTED,
-                 font=('DejaVu Sans',10)).pack(pady=(0,12))
-        board_host = tk.Frame(outer, bg=BG)
-        board_host.pack(fill='both', expand=True)
+            card = ScoreCard(scores, title, color, family=self.family)
+            card.grid(row=0, column=column, sticky='ew', padx=(0, 10) if column < 2 else 0)
+            self.score_cards[key] = card
+        board_host = tk.Frame(main, bg=BG)
+        board_host.pack(fill='both', expand=True, pady=(15, 12))
         board = tk.Frame(board_host, bg=BG)
         def resize_board(event):
-            side = min(event.width, event.height)
+            side = max(1, min(event.width, event.height, 470))
             board.place(relx=.5, rely=.5, anchor='center', width=side, height=side)
         board_host.bind('<Configure>', resize_board)
         for i in range(3):
             board.rowconfigure(i, weight=1, uniform='cell')
             board.columnconfigure(i, weight=1, uniform='cell')
         for i in range(9):
-            button = tk.Button(board, text='', bg=WHITE, activebackground='#e1eee5',
-                               fg=GREEN, disabledforeground=GREEN, relief='flat', bd=0,
-                               font=('DejaVu Sans',30,'bold'), cursor='hand2',
-                               takefocus=True, command=lambda cell=i: self.handle_click(cell))
-            button.grid(row=i//3, column=i%3, sticky='nsew', padx=4, pady=4)
-            self.buttons[i] = button
-        actions = tk.Frame(outer, bg=BG)
-        actions.pack(fill='x', pady=(16,0))
-        tk.Button(actions, text='Επόμενος γύρος →', command=self.next_round,
-                  bg=GREEN, fg=WHITE, activebackground='#10563f', activeforeground=WHITE,
-                  relief='flat', padx=16, pady=11, cursor='hand2',
-                  font=('DejaVu Sans',11,'bold')).pack(side='left')
-        tk.Button(actions, text='Μηδενισμός σκορ', command=self.reset_session,
-                  bg=BG, fg=MUTED, relief='flat', cursor='hand2').pack(side='right')
-        self._label(outer, '1–9: κίνηση   •   Ctrl+N: νέος γύρος   •   F1: βοήθεια').pack(pady=(14,0))
+            cell = BoardCell(board, i, lambda cell=i: self.handle_click(cell), family=self.family)
+            cell.grid(row=i//3, column=i%3, sticky='nsew', padx=3, pady=3)
+            self.buttons[i] = cell
+        self.next_button = ActionButton(main, 'Επόμενος γύρος   →', self.next_round,
+                                        kind='primary', font=(self.family, 11, 'bold'), height=47)
+        self.next_button.pack(fill='x')
+        self.label(main, '1–9  Κίνηση      /      Ctrl+N  Νέος γύρος      /      F1  Βοήθεια',
+                   size=9, color=MUTED).pack(pady=(13, 0))
 
     def _render(self):
         outcome = self.match.outcome
         line = winning_line(self.match.board)
+        computer = self.active_mode != MODES[0]
         for i, button in self.buttons.items():
             symbol = self.match.board[i]
-            button.configure(text=symbol, bg='#d3e9d8' if i in line else WHITE,
-                             disabledforeground=GREEN if symbol == 'X' else '#aa573e',
-                             state='disabled' if symbol or outcome or self.computer_turn else 'normal')
-        for key, value in self.score_text.items():
-            value.set(str(self.scores[key]))
+            button.set_cell(symbol, not (symbol or outcome or self.computer_turn),
+                            i in line, self.match.turn)
+        titles = {'X': 'Εσύ · X' if computer else 'Παίκτης X',
+                  'O': 'Υπολογιστής · O' if computer else 'Παίκτης O', 'draw': 'Ισοπαλίες'}
+        for key, card in self.score_cards.items():
+            card.set_value(self.scores[key], titles[key])
+        self.local_button.set_selected(not computer)
+        self.computer_button.set_selected(computer)
+        for mode, button in self.mode_buttons.items():
+            button.set_selected(mode == self.active_mode)
+        self.detail.set(DETAILS[MODES.index(self.active_mode)])
+        self.round_text.set(f'ΓΥΡΟΣ {self.round_number:02d}')
         if outcome == 'draw':
-            self.status.set('Ισοπαλία. Άλλη μία;')
+            self.status.set('Στα ίσα. Άλλη μία;')
+            self.subtitle.set('Καλή αναμέτρηση. Ο επόμενος γύρος είναι δικός σας.')
         elif outcome:
-            self.status.set('Κέρδισε ο υπολογιστής!' if outcome == 'O' and self.active_mode != MODES[0]
-                            else f'Νίκη για τον {outcome}!')
+            self.status.set('Τα κατάφερες!' if computer and outcome == 'X' else
+                            'Νίκη του υπολογιστή.' if computer else f'Νίκη για τον {outcome}!')
+            self.subtitle.set('Τρία στη σειρά. Ώρα για τη ρεβάνς!')
         else:
-            self.status.set('Ο υπολογιστής σκέφτεται…' if self.computer_turn else f'Σειρά του {self.match.turn}')
-        self.subtitle.set(f'Γύρος {self.round_number}  ·  ' +
-                          ('Ο γύρος ολοκληρώθηκε' if outcome else 'Τρία στη σειρά για τη νίκη'))
+            self.status.set('Ο υπολογιστής σκέφτεται…' if self.computer_turn else
+                            'Η σειρά σου.' if computer else f'Η σειρά του {self.match.turn}.')
+            self.subtitle.set('Παρατήρησε, σχεδίασε, παίξε.' if self.computer_turn else
+                              'Διάλεξε ένα κελί και φτιάξε τη δική σου τριάδα.')
 
     def handle_click(self, cell):
         if not self.computer_turn:
@@ -130,14 +184,13 @@ class TicTacToe(tk.Tk):
 
     def _schedule_computer(self):
         if self.computer_turn and not self.match.outcome and self.pending is None:
-            self.pending = self.after(350, self._computer_move)
+            self.pending = self.after(420, self._computer_move)
 
     def _computer_move(self):
         self.pending = None
         if not self.computer_turn or self.match.outcome:
             return
-        cell = choose_move(self.match.board, 'O', DIFFICULTIES[self.active_mode])
-        self._play(cell)
+        self._play(choose_move(self.match.board, 'O', DIFFICULTIES[self.active_mode]))
 
     def _cancel_pending(self):
         if self.pending is not None:
@@ -167,6 +220,13 @@ class TicTacToe(tk.Tk):
         self.round_number, self.starter = 1, 'X'
         self._new_round()
 
+    def select_computer(self):
+        self.select_mode(self.last_computer_mode)
+
+    def select_mode(self, mode):
+        self.mode.set(mode)
+        self.change_mode()
+
     def change_mode(self, event=None):
         if self.mode.get() == self.active_mode:
             return
@@ -175,24 +235,45 @@ class TicTacToe(tk.Tk):
                 self.mode.set(self.active_mode)
                 return
         self.active_mode = self.mode.get()
+        if self.active_mode != MODES[0]:
+            self.last_computer_mode = self.active_mode
         self._reset_session()
 
     def _key_move(self, event):
-        if event.char and event.char in '123456789' and not isinstance(self.focus_get(), ttk.Combobox):
+        if event.char and event.char in '123456789':
             self.handle_click(int(event.char)-1)
 
     def show_help(self):
-        messagebox.showinfo('Πώς παίζεται', 'Συμπλήρωσε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο.\n\n'
-                            'Παίξτε δύο άτομα ή επίλεξε υπολογιστή. Εσύ παίζεις με X, ο υπολογιστής με O. '
-                            'Διάλεξε επίπεδο:\n'
-                            '• Εύκολο: τυχαίες κινήσεις.\n'
-                            '• Μέτριο: βλέπει άμεσες νίκες και μπλοκάρει απειλές.\n'
-                            '• Δύσκολο: παίζει στρατηγικά, αλλά κάνει περιστασιακά λάθη.\n'
-                            '• Αήττητο: το καλύτερο δυνατό αποτέλεσμα είναι ισοπαλία.\n\n'
-                            'Οι παίκτες ξεκινούν εναλλάξ κάθε γύρο. Τα πλήκτρα 1–9 αντιστοιχούν στα κελιά '
-                            'από πάνω αριστερά προς τα κάτω δεξιά.\n\n'
-                            'Τα σκορ κρατούνται μόνο όσο είναι ανοιχτή η εφαρμογή.\n'
-                            'Έκδοση 1.1.0 · Λειτουργεί χωρίς σύνδεση στο διαδίκτυο.', parent=self)
+        popup = tk.Toplevel(self)
+        popup.title('Πώς παίζεται')
+        popup.configure(bg=PANEL)
+        popup.resizable(False, False)
+        popup.transient(self)
+        content = tk.Frame(popup, bg=PANEL, padx=28, pady=26)
+        content.pack()
+        self.label(content, 'Μια απλή ιδέα. Πολλές αναμετρήσεις.', size=16, bold=True,
+                   background=PANEL).pack(anchor='w', pady=(0, 18))
+        instructions = (
+            'Φτιάξε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο.\n\n'
+            'Με φίλο: μοιράζεστε το ίδιο ταμπλό. Με υπολογιστή: είσαι X.\n'
+            'Ο πρώτος παίκτης αλλάζει σε κάθε νέο γύρο.\n\n'
+            'Εύκολο  /  Τυχαίες κινήσεις, για ζέσταμα.\n'
+            'Μέτριο  /  Βλέπει απειλές, αλλά αφήνει ανοίγματα.\n'
+            'Δύσκολο  /  Σκέφτεται στρατηγικά, αλλά μπορείς να το κερδίσεις.\n'
+            'Αήττητο  /  Το καλύτερο δυνατό αποτέλεσμα είναι ισοπαλία.\n\n'
+            '1–9: κίνηση, από πάνω αριστερά προς κάτω δεξιά.\n'
+            'Tab και Space/Enter: επιλογή και ενεργοποίηση κουμπιών.\n'
+            'Ctrl+N: νέος γύρος. F1: βοήθεια.\n\n'
+            'Τα σκορ ισχύουν μόνο όσο είναι ανοιχτή η εφαρμογή.\n'
+            'Έκδοση 1.2.0 · Χωρίς σύνδεση στο διαδίκτυο.'
+        )
+        self.label(content, instructions, size=10, color=MUTED, background=PANEL,
+                   justify='left', wraplength=475).pack(anchor='w')
+        ActionButton(content, 'Πάμε να παίξουμε   →', popup.destroy, kind='primary',
+                     font=(self.family, 11, 'bold'), background=PANEL).pack(fill='x', pady=(22, 0))
+        popup.bind('<Escape>', lambda event: popup.destroy())
+        popup.update_idletasks()
+        popup.geometry(f'+{self.winfo_rootx()+80}+{self.winfo_rooty()+40}')
 
     def close(self):
         self._cancel_pending()

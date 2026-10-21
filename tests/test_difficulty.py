@@ -30,14 +30,35 @@ class DifficultyTests(unittest.TestCase):
             for level in ('medium', 'hard', 'unbeatable'):
                 with self.subTest(player=player, level=level):
                     # The opponent also threatens a win at 5; win now at 2.
-                    self.assertEqual(choose_move(board, player, level), 2)
+                    self.assertEqual(choose_move(board, player, level, ControlledRandom(8)), 2)
 
-    def test_tactical_levels_block_an_immediate_loss(self):
+    def test_tactical_levels_can_block_an_immediate_loss(self):
         for player, other in (('X', 'O'), ('O', 'X')):
             board = [other, other, '', '', player, '', '', '', '']
             for level in ('medium', 'hard', 'unbeatable'):
                 with self.subTest(player=player, level=level):
-                    self.assertEqual(choose_move(board, player, level), 2)
+                    self.assertEqual(choose_move(board, player, level, ControlledRandom(8, 0)), 2)
+
+    def test_intermediate_levels_can_miss_a_direct_threat(self):
+        for player, other in (('X', 'O'), ('O', 'X')):
+            for level in ('medium', 'hard'):
+                with self.subTest(player=player, level=level):
+                    board = [other, other, '', '', player, '', '', '', '']
+                    match = Match(board.copy(), player)
+                    missed_block = choose_move(board, player, level, ControlledRandom(8))
+                    self.assertTrue(match.play(missed_block))
+                    self.assertTrue(match.play(2))
+                    self.assertEqual(match.outcome, other)
+
+    def test_hard_notices_a_threat_that_medium_can_miss(self):
+        board = ['X', 'X', '', '', 'O', '', '', '', '']
+        self.assertEqual(choose_move(board, 'O', 'medium', ControlledRandom(8, .8)), 8)
+        self.assertEqual(choose_move(board, 'O', 'hard', ControlledRandom(8, .8)), 2)
+
+    def test_random_lapse_can_still_block_by_chance(self):
+        board = ['X', 'X', '', '', 'O', '', '', '', '']
+        for level in ('medium', 'hard'):
+            self.assertEqual(choose_move(board, 'O', level, ControlledRandom(2)), 2)
 
     def test_easy_can_miss_a_threat(self):
         board = ['X', 'X', '', 'O', '', '', '', '', '']
@@ -60,6 +81,10 @@ class DifficultyTests(unittest.TestCase):
         board = ['X', '', '', '', 'O', '', '', '', 'X']
         self.assertIn(choose_move(board, 'O', 'hard', ControlledRandom(2, .5)),
                       (1, 3, 5, 7))
+
+    def test_hard_can_overlook_a_fork_on_a_nonoptimal_turn(self):
+        board = ['X', '', '', '', 'O', '', '', '', 'X']
+        self.assertEqual(choose_move(board, 'O', 'hard', ControlledRandom(2, .75)), 2)
 
     def test_unbeatable_ignores_random_mistakes(self):
         board = ['X', '', '', '', 'O', '', '', '', 'X']
