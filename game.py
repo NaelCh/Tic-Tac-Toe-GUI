@@ -1,9 +1,12 @@
 """Greek desktop Tic Tac Toe with a custom, dependency-free interface."""
 import sys
+from pathlib import Path
 import tkinter as tk
 from tkinter import font as tkfont, messagebox
 
 from engine import Match, choose_move, winning_line
+from sounds import SoundPlayer
+from version import VERSION
 from ui import ActionButton, BoardCell, ScoreCard, rounded, BG, PANEL, TEXT, MUTED, TEAL, CORAL, PURPLE
 
 MODES = ('Δύο παίκτες', 'Υπολογιστής · εύκολο', 'Υπολογιστής · μέτριο',
@@ -26,6 +29,12 @@ class TicTacToe(tk.Tk):
         self.geometry(f'1040x{height}')
         self.minsize(860, 660)
         self.configure(bg=BG)
+        self.sounds = SoundPlayer()
+        if sys.platform == 'win32':
+            try:
+                self.iconbitmap(str(Path(__file__).resolve().parent / 'assets' / 'app.ico'))
+            except tk.TclError:
+                pass
         families = set(tkfont.families(self))
         candidates = ('Segoe UI', 'Helvetica Neue', 'DejaVu Sans')
         self.family = next((name for name in candidates if name in families), 'TkDefaultFont')
@@ -39,10 +48,11 @@ class TicTacToe(tk.Tk):
         self.buttons, self.score_cards, self.mode_buttons = {}, {}, {}
         self._build_ui()
         self._render()
-        self.bind('<Control-n>', lambda event: self.next_round())
+        self.bind('<Control-n>', lambda event: self._shortcut(self.next_round))
         if sys.platform == 'darwin':
-            self.bind('<Command-n>', lambda event: self.next_round())
-        self.bind('<F1>', lambda event: self.show_help())
+            self.bind('<Command-n>', lambda event: self._shortcut(self.next_round))
+        self.bind('<F1>', lambda event: self._shortcut(self.show_help))
+        self.bind('<F2>', lambda event: self.toggle_sound())
         self.bind('<KeyPress>', self._key_move)
         self.protocol('WM_DELETE_WINDOW', self.close)
 
@@ -54,6 +64,21 @@ class TicTacToe(tk.Tk):
     @property
     def computer_turn(self):
         return self.active_mode != MODES[0] and self.match.turn == 'O'
+
+    def play_click(self):
+        self.sounds.play('click')
+
+    def _shortcut(self, action):
+        self.play_click()
+        action()
+        return 'break'
+
+    def toggle_sound(self):
+        self.sounds.set_enabled(not self.sounds.enabled)
+        self.sound_button.text = 'Ήχος: ενεργός' if self.sounds.enabled else 'Ήχος: σίγαση'
+        self.sound_button.draw()
+        if self.sounds.enabled:
+            self.play_click()
 
     def _build_ui(self):
         sidebar = tk.Frame(self, bg=PANEL, width=276, padx=22, pady=26)
@@ -107,7 +132,11 @@ class TicTacToe(tk.Tk):
         top = tk.Frame(main, bg=BG)
         top.pack(fill='x')
         self.label(top, textvariable=self.round_text, size=10, color=PURPLE, bold=True).pack(side='left')
-        self.label(top, 'X + O  /  ΜΙΑ ΚΙΝΗΣΗ ΑΚΟΜΑ', size=9, color=MUTED).pack(side='right')
+        self.sound_button = ActionButton(top, 'Ήχος: ενεργός', self.toggle_sound,
+                                          font=(self.family, 9), height=30,
+                                          on_activate=lambda: None)
+        self.sound_button.configure(width=145)
+        self.sound_button.pack(side='right')
         self.label(main, textvariable=self.status, size=23, bold=True).pack(anchor='w', pady=(18, 2))
         self.label(main, textvariable=self.subtitle, size=10, color=MUTED).pack(anchor='w', pady=(0, 16))
         scores = tk.Frame(main, bg=BG)
@@ -136,7 +165,7 @@ class TicTacToe(tk.Tk):
         self.next_button = ActionButton(main, 'Επόμενος γύρος   →', self.next_round,
                                         kind='primary', font=(self.family, 11, 'bold'), height=47)
         self.next_button.pack(fill='x')
-        self.label(main, '1–9  Κίνηση      /      Ctrl+N  Νέος γύρος      /      F1  Βοήθεια',
+        self.label(main, '1–9: κίνηση   ·   Ctrl+N: γύρος   ·   F1: βοήθεια   ·   F2: ήχος',
                    size=9, color=MUTED).pack(pady=(13, 0))
 
     def _render(self):
@@ -175,10 +204,13 @@ class TicTacToe(tk.Tk):
             self._play(cell)
 
     def _play(self, cell):
+        player = self.match.turn
         if not self.match.play(cell):
             return
         if self.match.outcome:
             self.scores[self.match.outcome] += 1
+        self.sounds.play('draw' if self.match.outcome == 'draw' else 'win' if self.match.outcome
+                         else 'move_x' if player == 'X' else 'move_o')
         self._render()
         self._schedule_computer()
 
@@ -264,17 +296,20 @@ class TicTacToe(tk.Tk):
             '1–9: κίνηση, από πάνω αριστερά προς κάτω δεξιά.\n'
             'Tab και Space/Enter: επιλογή και ενεργοποίηση κουμπιών.\n'
             'Ctrl+N: νέος γύρος. F1: βοήθεια.\n\n'
+            'Ήχοι: κουμπί πάνω δεξιά ή F2 για σίγαση/ενεργοποίηση.\n\n'
             'Τα σκορ ισχύουν μόνο όσο είναι ανοιχτή η εφαρμογή.\n'
-            'Έκδοση 1.2.0 · Χωρίς σύνδεση στο διαδίκτυο.'
+            f'Έκδοση {VERSION} · Χωρίς σύνδεση στο διαδίκτυο.'
         )
         self.label(content, instructions, size=10, color=MUTED, background=PANEL,
                    justify='left', wraplength=475).pack(anchor='w')
         ActionButton(content, 'Πάμε να παίξουμε   →', popup.destroy, kind='primary',
-                     font=(self.family, 11, 'bold'), background=PANEL).pack(fill='x', pady=(22, 0))
+                     font=(self.family, 11, 'bold'), background=PANEL,
+                     on_activate=self.play_click).pack(fill='x', pady=(22, 0))
         popup.bind('<Escape>', lambda event: popup.destroy())
         popup.update_idletasks()
         popup.geometry(f'+{self.winfo_rootx()+80}+{self.winfo_rooty()+40}')
 
     def close(self):
         self._cancel_pending()
+        self.sounds.close()
         self.destroy()

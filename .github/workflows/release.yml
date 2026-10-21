@@ -1,0 +1,242 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Check release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid VERSION' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw 'Release tag must match VERSION'
+          }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Install build tools
+        run: python -m pip install --requirement requirements-build.txt
+      - name: Run rules, audio and desktop tests
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'triliza-tests.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Bundle Python, Tk and sound assets
+        shell: pwsh
+        run: |
+          python tools/build.py 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'triliza-build.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $compiler)) { throw 'Inno Setup 6 is missing from the Windows runner' }
+          & $compiler "/DAppVersion=$env:APP_VERSION" installer\windows.iss 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'triliza-installer.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Install, play smoke test and uninstall without Python on PATH
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "dist\Triliza-$env:APP_VERSION-Windows-Setup.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'Triliza-installed'
+          $report = Join-Path $env:RUNNER_TEMP 'triliza-smoke.json'
+          $log = Join-Path $env:RUNNER_TEMP 'triliza-install.log'
+          $install = Start-Process $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installDir`"", "/LOG=`"$log`"") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Install failed: $($install.ExitCode)" }
+          try {
+            $exe = Join-Path $installDir 'Triliza.exe'
+            if (!(Test-Path $exe)) { throw 'Installed executable is missing' }
+            $oldPath = $env:PATH
+            try {
+              $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+              $app = Start-Process $exe -ArgumentList @('--smoke-test', '--report', "`"$report`"") -PassThru
+              if (!$app.WaitForExit(30000)) {
+                $app.Kill()
+                throw 'Installed application smoke test timed out'
+              }
+              if ($app.ExitCode -ne 0) { throw "Installed app failed: $($app.ExitCode)" }
+            } finally {
+              $env:PATH = $oldPath
+            }
+            $result = Get-Content $report -Raw | ConvertFrom-Json
+            if (!$result.ok -or !$result.frozen -or !$result.sounds_bundled -or $result.version -ne $env:APP_VERSION) {
+              throw "Invalid smoke-test report: $(Get-Content $report -Raw)"
+            }
+          } finally {
+            $uninstaller = Join-Path $installDir 'unins000.exe'
+            if (Test-Path $uninstaller) {
+              $uninstall = Start-Process $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+              if ($uninstall.ExitCode -ne 0) { throw "Uninstall failed: $($uninstall.ExitCode)" }
+              if (Test-Path (Join-Path $installDir 'Triliza.exe')) { throw 'Uninstall left the application executable behind' }
+            } else { throw 'Uninstaller is missing' }
+          }
+      - name: Generate SHA256 checksum
+        shell: pwsh
+        run: |
+          $file = Get-Item "dist\Triliza-$env:APP_VERSION-Windows-Setup.exe"
+          $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($file.Name)" | Set-Content "$($file.FullName).sha256" -Encoding ascii
+      - name: Upload tested installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Installer
+          path: |
+            dist/Triliza-*-Windows-Setup.exe
+            dist/Triliza-*-Windows-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload installation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Install-Diagnostics
+          path: |
+            ${{ runner.temp }}/triliza-install.log
+            ${{ runner.temp }}/triliza-smoke.json
+            ${{ runner.temp }}/triliza-tests.log
+            ${{ runner.temp }}/triliza-build.log
+            ${{ runner.temp }}/triliza-installer.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish tested installer
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows-Installer
+          path: release-files
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release-files/* \
+            --verify-tag --title "Τρίλιζα ${RELEASE_TAG#v}" --generate-notes
+      # An immutable Git receipt exposes successful Windows validation even
+      # when the onboarding environment cannot reach the GitHub REST API.
+      # This prefix does not match the v* release trigger above.
+      - name: Record verified installer receipt
+        env:
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          installers = list(Path('release-files').glob('*-Windows-Setup.exe'))
+          assert len(installers) == 1, installers
+          installer = installers[0]
+          checksum = hashlib.sha256(installer.read_bytes()).hexdigest()
+          expected = Path(str(installer) + '.sha256').read_text().split()[0]
+          assert checksum == expected, 'Downloaded installer checksum mismatch'
+          tag = os.environ['RELEASE_TAG']
+          receipt = {
+              'version': tag.removeprefix('v'),
+              'verified': True,
+              'release_url': f"https://github.com/{os.environ['GH_REPO']}/releases/tag/{tag}",
+              'installer': installer.name,
+              'sha256': checksum,
+          }
+          Path('windows-installer-receipt.json').write_text(
+              json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+          PYTHON
+          receipt_tag="windows-installer/$RELEASE_TAG"
+          existing="$(git ls-remote --tags origin "refs/tags/$receipt_tag")"
+          if [ -n "$existing" ]; then
+            echo 'Refusing to overwrite an existing installer receipt.' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$receipt_tag" "$GITHUB_SHA" -F windows-installer-receipt.json
+          git push origin "refs/tags/$receipt_tag"
+
+  failure-report:
+    name: Record bounded failure diagnostics
+    needs: [build, release]
+    if: always() && (needs.build.result == 'failure' || needs.release.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: Windows-Install-Diagnostics
+          path: failure-logs
+      - name: Record installer failure receipt
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+
+          # Only known build logs; never read environment dumps or credentials.
+          names = ('triliza-tests.log', 'triliza-build.log',
+                   'triliza-installer.log', 'triliza-install.log')
+          tails = {}
+          for name in names:
+              path = Path('failure-logs') / name
+              if path.is_file():
+                  with path.open('rb') as stream:
+                      stream.seek(max(0, path.stat().st_size - 16000))
+                      text = stream.read(16000).decode('utf-8', errors='replace')
+                  tails[name] = '\n'.join(text.splitlines()[-50:])[-12000:]
+          report = {
+              'verified': False,
+              'tag': os.environ['RELEASE_TAG'],
+              'build_result': os.environ['BUILD_RESULT'],
+              'release_result': os.environ['RELEASE_RESULT'],
+              'run_url': os.environ['RUN_URL'],
+              'log_tails': tails,
+          }
+          Path('windows-installer-error.json').write_text(
+              json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          PYTHON
+          error_tag="windows-installer-error/$RELEASE_TAG"
+          existing="$(git ls-remote --tags origin "refs/tags/$error_tag")"
+          if [ -n "$existing" ]; then
+            echo 'An immutable failure receipt already exists; leaving it unchanged.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$error_tag" "$GITHUB_SHA" -F windows-installer-error.json
+          git push origin "refs/tags/$error_tag"

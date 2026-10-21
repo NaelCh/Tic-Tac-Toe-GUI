@@ -22,10 +22,12 @@ def rounded(canvas, x1, y1, x2, y2, radius=16, **kwargs):
 
 class ActionButton(tk.Canvas):
     def __init__(self, parent, text, command, *, font, kind='quiet',
-                 height=44, background=BG, **kwargs):
+                 height=44, background=BG, on_activate=None, **kwargs):
         super().__init__(parent, height=height, width=1, bg=background,
                          highlightthickness=0, takefocus=True, cursor='hand2', **kwargs)
         self.text, self.command, self.font, self.kind = text, command, font, kind
+        self.on_activate = (on_activate if on_activate is not None else
+                            getattr(self.winfo_toplevel(), 'play_click', None))
         self.selected, self.hovered = False, False
         self.bind('<Configure>', lambda event: self.draw())
         self.bind('<Enter>', lambda event: self._hover(True))
@@ -45,6 +47,8 @@ class ActionButton(tk.Canvas):
         self.invoke()
 
     def invoke(self):
+        if self.on_activate is not None:
+            self.on_activate()
         self.command()
 
     def set_selected(self, value):

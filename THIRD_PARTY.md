@@ -1,7 +1,9 @@
 # Third-party components
 
 The source game uses Python's standard library (Tkinter, dataclasses, functools,
-random). It contains no downloaded artwork or bundled custom fonts.
+random, wave and platform audio APIs). It contains no downloaded artwork or
+bundled custom fonts. The WAV effects and application icon are original generated
+assets created for this repository; they do not use sampled third-party audio.
 A frozen distribution includes Python, Tcl/Tk and platform-dependent libraries.
 
 - Python: PSF License and bundled component notices — https://docs.python.org/3/license.html

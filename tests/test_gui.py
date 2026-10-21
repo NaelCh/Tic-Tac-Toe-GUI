@@ -8,6 +8,7 @@ from game import TicTacToe, MODES
 class DesktopTests(unittest.TestCase):
     def setUp(self):
         self.app = TicTacToe()
+        self.app.sounds.set_enabled(False)
         self.app.update()
         self.addCleanup(self.app.close)
 
@@ -149,6 +150,30 @@ class DesktopTests(unittest.TestCase):
         popup.event_generate('<KeyPress-Escape>')
         self.app.update()
         self.assertFalse(popup.winfo_exists())
+
+    def test_moves_and_round_end_use_distinct_sound_effects(self):
+        with patch.object(self.app.sounds, 'play') as play:
+            self.app.buttons[0].invoke()
+            play.assert_called_once_with('move_x')
+            self.app.buttons[0].invoke()
+            self.assertEqual(play.call_count, 1)
+            self.app.buttons[3].invoke()
+            play.assert_called_with('move_o')
+            for cell in (1, 4, 2):
+                self.app.buttons[cell].invoke()
+            play.assert_called_with('win')
+
+    def test_action_buttons_click_and_f2_toggles_mute(self):
+        with patch.object(self.app.sounds, 'play') as play:
+            self.app.mode_buttons[MODES[2]].invoke()
+            play.assert_called_once_with('click')
+        self.app.sound_button.invoke()
+        self.assertTrue(self.app.sounds.enabled)
+        self.app.focus_force()
+        self.app.update()
+        self.app.event_generate('<KeyPress-F2>')
+        self.assertFalse(self.app.sounds.enabled)
+        self.assertIn('σίγαση', self.app.sound_button.text)
 
 
 if __name__ == '__main__':
