@@ -139,5 +139,4 @@ ISCC.exe /DAppVersion=1.3.1 installer\windows.iss
 στο macOS. Στο Linux χρειάζεται διαθέσιμο `paplay` ή `aplay`. Αν δεν υπάρχει
 συσκευή ή διαθέσιμος player, το παιχνίδι συνεχίζει κανονικά χωρίς ήχο.
 
-Δες το [COMMERCIAL.md](COMMERCIAL.md) για τα βήματα πριν από πώληση και το
-[THIRD_PARTY.md](THIRD_PARTY.md) για τις άδειες εξαρτήσεων.
+Δες το [THIRD_PARTY.md](THIRD_PARTY.md) για τις άδειες εξαρτήσεων.
