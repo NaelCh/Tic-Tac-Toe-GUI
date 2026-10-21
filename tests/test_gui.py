@@ -2,6 +2,7 @@
 import time
 import unittest
 from unittest.mock import patch
+from engine import Match
 from game import TicTacToe, MODES
 
 
@@ -174,6 +175,39 @@ class DesktopTests(unittest.TestCase):
         self.app.event_generate('<KeyPress-F2>')
         self.assertFalse(self.app.sounds.enabled)
         self.assertIn('σίγαση', self.app.sound_button.text)
+
+    def test_computer_victory_plays_loss_sound(self):
+        self.app.select_mode(MODES[-1])
+        self.app.match = Match(['O', 'O', '', 'X', 'X', '', '', '', ''], 'O')
+        self.app._render()
+        with patch.object(self.app.sounds, 'play') as play:
+            self.app._computer_move()
+            self.assertEqual(self.app.match.outcome, 'O')
+            self.assertEqual(self.app.scores['O'], 1)
+            play.assert_called_once_with('lose')
+
+    def test_human_victory_against_computer_keeps_win_sound(self):
+        self.app.select_mode(MODES[-1])
+        self.app.match = Match(['X', 'X', '', 'O', 'O', '', '', '', ''], 'X')
+        self.app._render()
+        with patch.object(self.app.sounds, 'play') as play:
+            self.app.buttons[2].invoke()
+            self.assertEqual(self.app.match.outcome, 'X')
+            play.assert_called_once_with('win')
+
+    def test_local_o_victory_keeps_win_sound(self):
+        with patch.object(self.app.sounds, 'play') as play:
+            for cell in (0, 3, 1, 4, 8, 5):
+                self.app.buttons[cell].invoke()
+            self.assertEqual(self.app.match.outcome, 'O')
+            play.assert_called_with('win')
+
+    def test_draw_keeps_draw_sound(self):
+        with patch.object(self.app.sounds, 'play') as play:
+            for cell in (0, 1, 2, 4, 3, 5, 7, 6, 8):
+                self.app.buttons[cell].invoke()
+            self.assertEqual(self.app.match.outcome, 'draw')
+            play.assert_called_with('draw')
 
 
 if __name__ == '__main__':

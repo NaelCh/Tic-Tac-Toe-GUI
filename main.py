@@ -28,7 +28,8 @@ def smoke_test(report_path):
         for name in SOUND_NAMES:
             with wave.open(str(app.sounds.asset_dir / f'{name}.wav'), 'rb') as sound:
                 assert sound.getnframes() > 0 and sound.getnchannels() == 1
-        result.update(ok=True, sounds_bundled=True)
+        assert 'lose' in SOUND_NAMES
+        result.update(ok=True, sounds_bundled=True, loss_sound_bundled=True)
     except Exception as error:
         result['error'] = f'{type(error).__name__}: {error}'
     finally:

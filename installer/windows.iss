@@ -1,5 +1,5 @@
 ﻿; Build from the repository root with:
-; ISCC.exe /DAppVersion=1.3.0 installer\windows.iss
+; ISCC.exe /DAppVersion=1.3.1 installer\windows.iss
 ; AppVersion is supplied from VERSION by the release workflow.
 #ifndef AppVersion
   #error AppVersion must be supplied from VERSION using /DAppVersion
@@ -12,6 +12,7 @@ AppName=Τρίλιζα
 AppVersion={#AppVersion}
 AppVerName=Τρίλιζα {#AppVersion}
 DefaultDirName={localappdata}\Programs\Triliza
+UsePreviousAppDir=yes
 DefaultGroupName=Τρίλιζα
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest

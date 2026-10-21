@@ -207,10 +207,16 @@ class TicTacToe(tk.Tk):
         player = self.match.turn
         if not self.match.play(cell):
             return
-        if self.match.outcome:
-            self.scores[self.match.outcome] += 1
-        self.sounds.play('draw' if self.match.outcome == 'draw' else 'win' if self.match.outcome
-                         else 'move_x' if player == 'X' else 'move_o')
+        outcome = self.match.outcome
+        if outcome:
+            self.scores[outcome] += 1
+        if outcome == 'draw':
+            sound = 'draw'
+        elif outcome:
+            sound = 'lose' if outcome == 'O' and self.active_mode != MODES[0] else 'win'
+        else:
+            sound = 'move_x' if player == 'X' else 'move_o'
+        self.sounds.play(sound)
         self._render()
         self._schedule_computer()
 

@@ -182,6 +182,11 @@ class SoundTests(unittest.TestCase):
                 self.assertGreater(max(abs(value) for value in samples), 100)
                 self.assertLess(max(abs(value) for value in samples), 32767*.25)
 
+    def test_loss_effect_is_bundled_and_distinct_from_victory(self):
+        directory = Path(__file__).resolve().parents[1]/'assets'/'sounds'
+        self.assertIn('lose', SOUND_NAMES)
+        self.assertNotEqual((directory/'lose.wav').read_bytes(), (directory/'win.wav').read_bytes())
+
 
 if __name__ == '__main__':
     unittest.main()

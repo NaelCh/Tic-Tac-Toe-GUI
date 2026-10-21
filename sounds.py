@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 
-SOUND_NAMES = frozenset(('click', 'move_x', 'move_o', 'win', 'draw'))
+SOUND_NAMES = frozenset(('click', 'move_x', 'move_o', 'win', 'lose', 'draw'))
 _STOP = object()
 
 

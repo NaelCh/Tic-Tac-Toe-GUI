@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  UPGRADE_FROM: '1.3.0'
+
 jobs:
   build:
     name: Build and test Windows installer
@@ -78,7 +81,7 @@ jobs:
               $env:PATH = $oldPath
             }
             $result = Get-Content $report -Raw | ConvertFrom-Json
-            if (!$result.ok -or !$result.frozen -or !$result.sounds_bundled -or $result.version -ne $env:APP_VERSION) {
+            if (!$result.ok -or !$result.frozen -or !$result.sounds_bundled -or !$result.loss_sound_bundled -or $result.version -ne $env:APP_VERSION) {
               throw "Invalid smoke-test report: $(Get-Content $report -Raw)"
             }
           } finally {
@@ -88,6 +91,90 @@ jobs:
               if ($uninstall.ExitCode -ne 0) { throw "Uninstall failed: $($uninstall.ExitCode)" }
               if (Test-Path (Join-Path $installDir 'Triliza.exe')) { throw 'Uninstall left the application executable behind' }
             } else { throw 'Uninstaller is missing' }
+          }
+      - name: Upgrade an existing installation without uninstalling it
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'triliza-upgrade.log'
+          $oldInstallerDir = Join-Path $env:RUNNER_TEMP 'Triliza-previous-installer'
+          $installDir = Join-Path $env:RUNNER_TEMP 'Triliza-upgrade-custom-path'
+          $newInstaller = (Resolve-Path "dist\Triliza-$env:APP_VERSION-Windows-Setup.exe").Path
+          $registryPaths = @(
+            'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{72E520F5-29DC-4D60-8791-C85A53901B95}_is1',
+            'HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{72E520F5-29DC-4D60-8791-C85A53901B95}_is1'
+          )
+          function Get-TrilizaEntries {
+            foreach ($path in $registryPaths) {
+              if (Test-Path $path) { Get-ItemProperty $path }
+            }
+          }
+          function Write-UpgradeLog($message) {
+            $message | Tee-Object -FilePath $log -Append
+          }
+          function Invoke-InstalledGameSmoke($expectedVersion, $report, $requireLossSound) {
+            $oldPath = $env:PATH
+            try {
+              $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+              $exe = Join-Path $installDir 'Triliza.exe'
+              $app = Start-Process $exe -ArgumentList @('--smoke-test', '--report', "`"$report`"") -PassThru
+              if (!$app.WaitForExit(30000)) {
+                $app.Kill()
+                throw 'Upgrade application smoke test timed out'
+              }
+              if ($app.ExitCode -ne 0) { throw "Upgrade app failed: $($app.ExitCode)" }
+            } finally {
+              $env:PATH = $oldPath
+            }
+            $result = Get-Content $report -Raw | ConvertFrom-Json
+            if (!$result.ok -or !$result.frozen -or !$result.sounds_bundled -or $result.version -ne $expectedVersion) {
+              throw "Unexpected upgraded app report: $(Get-Content $report -Raw)"
+            }
+            if ($requireLossSound -and !$result.loss_sound_bundled) {
+              throw 'Upgraded app is missing the new loss sound'
+            }
+          }
+          try {
+            if (@(Get-TrilizaEntries).Count -ne 0) { throw 'Clean-install test left an uninstall registration behind' }
+            gh release download "v$env:UPGRADE_FROM" --pattern "Triliza-$env:UPGRADE_FROM-Windows-Setup.exe*" --dir $oldInstallerDir
+            if ($LASTEXITCODE -ne 0) { throw 'Previous release installer download failed' }
+            $oldInstaller = Join-Path $oldInstallerDir "Triliza-$env:UPGRADE_FROM-Windows-Setup.exe"
+            $expectedHash = ((Get-Content "$oldInstaller.sha256" -Raw).Trim() -split '\s+')[0]
+            if ((Get-FileHash $oldInstaller -Algorithm SHA256).Hash.ToLower() -ne $expectedHash.ToLower()) {
+              throw 'Previous installer checksum mismatch'
+            }
+            $oldLog = Join-Path $env:RUNNER_TEMP 'triliza-upgrade-old-install.log'
+            $oldInstall = Start-Process $oldInstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installDir`"", "/LOG=`"$oldLog`"") -Wait -PassThru
+            if ($oldInstall.ExitCode -ne 0) { throw "Previous install failed: $($oldInstall.ExitCode)" }
+            Invoke-InstalledGameSmoke $env:UPGRADE_FROM (Join-Path $env:RUNNER_TEMP 'triliza-upgrade-before.json') $false
+            Write-UpgradeLog "Previous version $env:UPGRADE_FROM installed and playable at a custom path."
+            if (@(Get-TrilizaEntries).Count -ne 1) { throw 'Previous install must have exactly one uninstall entry' }
+            $newLog = Join-Path $env:RUNNER_TEMP 'triliza-upgrade-new-install.log'
+            # Deliberately omit /DIR: the stable AppId must locate the previous installation.
+            $upgrade = Start-Process $newInstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$newLog`"") -Wait -PassThru
+            if ($upgrade.ExitCode -ne 0) { throw "Upgrade failed: $($upgrade.ExitCode)" }
+            Invoke-InstalledGameSmoke $env:APP_VERSION (Join-Path $env:RUNNER_TEMP 'triliza-upgrade-after.json') $true
+            $entries = @(Get-TrilizaEntries)
+            if ($entries.Count -ne 1 -or $entries[0].DisplayVersion -ne $env:APP_VERSION) {
+              throw 'Upgrade created a duplicate app or failed to update the uninstall version'
+            }
+            $registeredPath = $entries[0].InstallLocation.TrimEnd('\')
+            if ($registeredPath -ne $installDir.TrimEnd('\')) { throw 'Upgrade did not reuse the previous installation directory' }
+            Write-UpgradeLog "Upgraded in place to $env:APP_VERSION; new sound bundled, one uninstall entry, no Python on PATH."
+          } catch {
+            Write-UpgradeLog $_.Exception.Message
+            throw
+          } finally {
+            $uninstaller = Join-Path $installDir 'unins000.exe'
+            if (Test-Path $uninstaller) {
+              $uninstall = Start-Process $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+              if ($uninstall.ExitCode -ne 0) { throw "Upgraded app uninstall failed: $($uninstall.ExitCode)" }
+              if (Test-Path (Join-Path $installDir 'Triliza.exe')) { throw 'Upgrade uninstall left the executable behind' }
+              if (@(Get-TrilizaEntries).Count -ne 0) { throw 'Upgrade uninstall left an uninstall registration behind' }
+              Write-UpgradeLog 'Upgraded app uninstalled successfully.'
+            }
           }
       - name: Generate SHA256 checksum
         shell: pwsh
@@ -115,6 +202,8 @@ jobs:
             ${{ runner.temp }}/triliza-tests.log
             ${{ runner.temp }}/triliza-build.log
             ${{ runner.temp }}/triliza-installer.log
+            ${{ runner.temp }}/triliza-upgrade*.log
+            ${{ runner.temp }}/triliza-upgrade-*.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -163,6 +252,8 @@ jobs:
           receipt = {
               'version': tag.removeprefix('v'),
               'verified': True,
+              'upgrade_verified': True,
+              'upgrade_from': os.environ['UPGRADE_FROM'],
               'release_url': f"https://github.com/{os.environ['GH_REPO']}/releases/tag/{tag}",
               'installer': installer.name,
               'sha256': checksum,
@@ -210,7 +301,9 @@ jobs:
 
           # Only known build logs; never read environment dumps or credentials.
           names = ('triliza-tests.log', 'triliza-build.log',
-                   'triliza-installer.log', 'triliza-install.log')
+                   'triliza-installer.log', 'triliza-install.log',
+                   'triliza-upgrade.log', 'triliza-upgrade-old-install.log',
+                   'triliza-upgrade-new-install.log')
           tails = {}
           for name in names:
               path = Path('failure-logs') / name
