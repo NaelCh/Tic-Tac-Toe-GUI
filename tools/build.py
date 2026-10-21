@@ -96,7 +96,7 @@ def build():
     args.append(str(ROOT / 'main.py'))
     subprocess.run(args, cwd=ROOT, check=True)
     package = ROOT / 'dist' / 'Triliza'
-    for name in ('README.md', 'COMMERCIAL.md', 'THIRD_PARTY.md', 'VERSION'):
+    for name in ('README.md', 'THIRD_PARTY.md', 'VERSION'):
         shutil.copy2(ROOT / name, package / name)
     if (ROOT / 'docs' / 'screenshot.png').is_file():
         (package / 'docs').mkdir(exist_ok=True)
