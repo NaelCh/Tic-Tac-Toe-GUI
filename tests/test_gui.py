@@ -40,7 +40,7 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(any(self.app.scores.values()))
         self.assertEqual(self.app.match.turn, 'X')
 
-    def test_both_computer_levels_and_alternating_start(self):
+    def test_all_computer_levels_and_alternating_start(self):
         for mode in MODES[1:]:
             self.app.mode.set(mode)
             with patch('game.messagebox.askyesno', return_value=True):
@@ -59,14 +59,14 @@ class DesktopTests(unittest.TestCase):
 
     def test_mode_cancel_preserves_round(self):
         self.app.handle_click(0)
-        self.app.mode.set(MODES[2])
+        self.app.mode.set(MODES[-1])
         with patch('game.messagebox.askyesno', return_value=False):
             self.app.change_mode()
         self.assertEqual(self.app.mode.get(), MODES[0])
         self.assertEqual(self.app.match.board[0], 'X')
 
     def test_reset_cancels_pending_computer_callback(self):
-        self.app.mode.set(MODES[2])
+        self.app.mode.set(MODES[-1])
         self.app.change_mode()
         self.app.handle_click(0)
         with patch('game.messagebox.askyesno', return_value=True):
@@ -77,7 +77,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.app.match.board, [''] * 9)
 
     def test_cancel_mode_change_during_computer_move(self):
-        self.app.mode.set(MODES[2])
+        self.app.mode.set(MODES[-1])
         self.app.change_mode()
         self.app.handle_click(0)
         self.app.mode.set(MODES[0])
@@ -89,7 +89,7 @@ class DesktopTests(unittest.TestCase):
 
         with patch('game.messagebox.askyesno', side_effect=cancel_after_computer_moves):
             self.app.change_mode()
-        self.assertEqual(self.app.mode.get(), MODES[2])
+        self.assertEqual(self.app.mode.get(), MODES[-1])
         self.assertEqual(self.app.match.board.count('O'), 1)
         self.assertEqual(self.app.match.turn, 'X')
         self.assertIsNone(self.app.pending)

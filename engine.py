@@ -1,4 +1,5 @@
-"""Rules and perfect-play opponent, independent of the desktop interface."""
+"""Rules and computer opponents, independent of the desktop interface."""
+import random
 from dataclasses import dataclass, field
 from functools import lru_cache
 
@@ -54,3 +55,33 @@ def best_move(board, turn):
     other = 'O' if turn == 'X' else 'X'
     moves = [i for i in (4,0,2,6,8,1,3,5,7) if not board[i]]
     return max(moves, key=lambda i: -_value(board[:i] + (turn,) + board[i+1:], other))
+
+
+def choose_move(board, turn, difficulty, rng=None):
+    """Choose a legal move without changing the board.
+
+    Medium sees immediate wins and threats. Hard adds perfect play on 85% of
+    non-forced decisions, leaving occasional openings for a human to exploit.
+    Neither intermediate level ever deliberately misses a one-move win/block.
+    ``rng`` can be a seeded Random instance for reproducible games and tests.
+    """
+    if difficulty not in ('easy', 'medium', 'hard', 'unbeatable'):
+        raise ValueError(f'Unknown difficulty: {difficulty}')
+    if result(board):
+        return None
+    if difficulty == 'unbeatable':
+        return best_move(board, turn)
+    rng = random if rng is None else rng
+    legal = [i for i, value in enumerate(board) if not value]
+    if difficulty == 'easy':
+        return rng.choice(legal)
+    other = 'O' if turn == 'X' else 'X'
+    for player in (turn, other):
+        for cell in legal:
+            candidate = list(board)
+            candidate[cell] = player
+            if result(candidate) == player:
+                return cell
+    if difficulty == 'hard' and rng.random() < .85:
+        return best_move(board, turn)
+    return rng.choice(legal)

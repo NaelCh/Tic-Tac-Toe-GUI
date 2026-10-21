@@ -1,11 +1,12 @@
 """Greek desktop Tic Tac Toe. No third-party runtime dependencies."""
-import random
 import tkinter as tk
 from tkinter import messagebox, ttk
-from engine import Match, best_move, winning_line
+from engine import Match, choose_move, winning_line
 
 BG, INK, MUTED, GREEN, WHITE = '#f4f2ec', '#203731', '#64756c', '#18755b', '#ffffff'
-MODES = ('Δύο παίκτες', 'Υπολογιστής · εύκολο', 'Υπολογιστής · αήττητο')
+MODES = ('Δύο παίκτες', 'Υπολογιστής · εύκολο', 'Υπολογιστής · μέτριο',
+         'Υπολογιστής · δύσκολο', 'Υπολογιστής · αήττητο')
+DIFFICULTIES = dict(zip(MODES[1:], ('easy', 'medium', 'hard', 'unbeatable')))
 
 
 class TicTacToe(tk.Tk):
@@ -135,8 +136,7 @@ class TicTacToe(tk.Tk):
         self.pending = None
         if not self.computer_turn or self.match.outcome:
             return
-        cell = (random.choice([i for i, value in enumerate(self.match.board) if not value])
-                if self.active_mode == MODES[1] else best_move(self.match.board, 'O'))
+        cell = choose_move(self.match.board, 'O', DIFFICULTIES[self.active_mode])
         self._play(cell)
 
     def _cancel_pending(self):
@@ -184,11 +184,15 @@ class TicTacToe(tk.Tk):
     def show_help(self):
         messagebox.showinfo('Πώς παίζεται', 'Συμπλήρωσε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο.\n\n'
                             'Παίξτε δύο άτομα ή επίλεξε υπολογιστή. Εσύ παίζεις με X, ο υπολογιστής με O. '
-                            'Στο αήττητο επίπεδο, το καλύτερο δυνατό αποτέλεσμα είναι ισοπαλία.\n\n'
+                            'Διάλεξε επίπεδο:\n'
+                            '• Εύκολο: τυχαίες κινήσεις.\n'
+                            '• Μέτριο: βλέπει άμεσες νίκες και μπλοκάρει απειλές.\n'
+                            '• Δύσκολο: παίζει στρατηγικά, αλλά κάνει περιστασιακά λάθη.\n'
+                            '• Αήττητο: το καλύτερο δυνατό αποτέλεσμα είναι ισοπαλία.\n\n'
                             'Οι παίκτες ξεκινούν εναλλάξ κάθε γύρο. Τα πλήκτρα 1–9 αντιστοιχούν στα κελιά '
                             'από πάνω αριστερά προς τα κάτω δεξιά.\n\n'
                             'Τα σκορ κρατούνται μόνο όσο είναι ανοιχτή η εφαρμογή.\n'
-                            'Έκδοση 1.0.0 · Λειτουργεί χωρίς σύνδεση στο διαδίκτυο.', parent=self)
+                            'Έκδοση 1.1.0 · Λειτουργεί χωρίς σύνδεση στο διαδίκτυο.', parent=self)
 
     def close(self):
         self._cancel_pending()
