@@ -8,7 +8,7 @@ on a current computer. No separate repository is needed.
 ## Download and install
 
 Open the repository's **Releases** page and select the prerelease whose tag is
-`legacy-v1.3.3` (or a newer `legacy-v…` tag). Download
+`legacy-v1.3.3-r2` (or a newer `legacy-v…` tag). Download
 `Triliza-1.3.3-Windows7-SP1-x64-Setup.exe`, run it, then open **Τρίλιζα Legacy**
 from the Start menu. A release is published only after the installer passes
 the automated Windows build, installation, game smoke test and removal checks.
@@ -71,7 +71,9 @@ verification is never disabled to work around an unavailable download.
 
 The **Windows 7 Legacy installer** workflow can be run manually to produce
 an Actions artifact. Push `legacy-v<matching VERSION>` to publish it as a
-GitHub prerelease after testing. It uses a distinct tag prefix so the modern
+GitHub prerelease after testing. A build-only revision may append `-r2`, `-r3`,
+and so on without changing the game's `VERSION` or overwriting an existing tag.
+It uses a distinct tag prefix so the modern
 Windows release workflow is not triggered. Published installer files have
 a companion `.sha256` checksum. Successful publication also creates an
 immutable `windows7-installer/<release-tag>` Git receipt that explicitly
@@ -84,3 +86,11 @@ Upstream compatibility references:
 - [PyInstaller 3.6 requirements](https://pyinstaller.org/en/v3.6/requirements.html)
 - [PyInstaller 3.6 supported Python versions](https://github.com/pyinstaller/pyinstaller/tree/v3.6)
 - [Inno Setup 6.2.2 documentation source](https://github.com/jrsoftware/issrc/blob/is-6_2_2/ISHelp/isetup.xml)
+
+Python's Windows runtime omits separate Tcl/Tk notice files. The build keeps
+verbatim upstream notices under `installer/licenses` and uses them only if the
+actual Tcl and Tk runtimes report version 8.6.9. Source copies:
+
+- [Tcl 8.6.9 license](https://github.com/tcltk/tcl/blob/core-8-6-9/license.terms)
+- [Tk 8.6.9 license](https://github.com/tcltk/tk/blob/core-8-6-9/license.terms)
+- [Python 3.7.9's pinned external library versions](https://github.com/python/cpython/blob/v3.7.9/PCbuild/get_externals.bat)

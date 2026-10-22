@@ -41,11 +41,25 @@ def collect_notices(package):
     base = Path(sys.base_prefix)
     copy_required((base / 'LICENSE.txt', base / 'LICENSE'), 'Python-LICENSE.txt')
     import tkinter
-    tcl_library = Path(tkinter.Tcl().eval('info library'))
-    copy_required((tcl_library / 'license.terms',), 'Tcl-LICENSE.txt')
-    copy_required(tuple(candidate / 'license.terms'
-                        for candidate in tcl_library.parent.glob('tk*')),
-                  'Tk-LICENSE.txt')
+    window = tkinter.Tk()
+    window.withdraw()
+    try:
+        tcl_library = Path(window.tk.eval('info library'))
+        tcl_version = str(window.tk.call('info', 'patchlevel'))
+        tk_version = str(window.tk.call('package', 'provide', 'Tk'))
+    finally:
+        window.destroy()
+    # The official Python 3.7.9 Windows package omits these external notices.
+    # Use exact upstream copies only when their version matches the actual Tk.
+    tcl_candidates = [tcl_library / 'license.terms']
+    tk_candidates = [candidate / 'license.terms'
+                     for candidate in tcl_library.parent.glob('tk*')]
+    if tcl_version == '8.6.9':
+        tcl_candidates.append(ROOT / 'installer' / 'licenses' / 'Tcl-8.6.9-LICENSE.txt')
+    if tk_version == '8.6.9':
+        tk_candidates.append(ROOT / 'installer' / 'licenses' / 'Tk-8.6.9-LICENSE.txt')
+    copy_required(tcl_candidates, 'Tcl-LICENSE.txt')
+    copy_required(tk_candidates, 'Tk-LICENSE.txt')
     distribution = importlib_metadata.distribution('pyinstaller')
     candidates = []
     for entry in distribution.files or ():
