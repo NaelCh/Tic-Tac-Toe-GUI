@@ -1,0 +1,71 @@
+name: Read Legacy build diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Windows Legacy workflow run to inspect
+        required: true
+        default: '39829056541'
+  push:
+    branches: [master]
+    paths: ['.github/workflows/legacy-diagnostics.yml']
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record bounded failed-job logs without exposing credentials
+        uses: actions/github-script@v7
+        env:
+          DIAGNOSTIC_RUN_ID: ${{ inputs.run_id || '39829056541' }}
+        with:
+          script: |
+            const params = {owner: context.repo.owner, repo: context.repo.repo};
+            const run_id = Number(process.env.DIAGNOSTIC_RUN_ID);
+            if (!Number.isSafeInteger(run_id) || run_id < 1) throw new Error('Invalid run ID');
+            const run = await github.rest.actions.getWorkflowRun({...params, run_id});
+            if (run.data.path !== '.github/workflows/windows7.yml') {
+              throw new Error('Only the Windows Legacy workflow may be inspected');
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...params, run_id});
+            const report = {run_id, commit: run.data.head_sha, jobs: []};
+            for (const job of jobs.filter(job => job.conclusion === 'failure')) {
+              const failedSteps = job.steps.filter(step => step.conclusion === 'failure');
+              const item = {name: job.name, failed_steps: failedSteps.map(step => step.name)};
+              try {
+                const result = await github.rest.actions.downloadJobLogsForWorkflowRun({...params, job_id: job.id});
+                const log = typeof result.data === 'string' ? result.data : Buffer.from(result.data).toString('utf8');
+                // GitHub masks action secrets before creating these logs. Keep
+                // only failed-step output, never environment or credential files.
+                const selected = [];
+                let include = false;
+                for (const line of log.split('\n')) {
+                  if (line.includes('##[group]')) {
+                    include = line.includes('Run ') && (
+                      line.includes("$log = Join-Path") || line.includes("python3 - <<'PYTHON'"));
+                  }
+                  if (include) selected.push(line);
+                }
+                item.log_tail = selected.slice(-100).join('\n').slice(-18000);
+                if (!item.log_tail) item.log_tail = log.split('\n').slice(-80).join('\n').slice(-14000);
+              } catch (error) {
+                item.error = error.message;
+              }
+              report.jobs.push(item);
+            }
+            const tag = `legacy-diagnostics/${run_id}`;
+            const ref = `tags/${tag}`;
+            try {
+              await github.rest.git.getRef({...params, ref});
+              core.info('An immutable diagnostic receipt already exists.');
+              return;
+            } catch (error) { if (error.status !== 404) throw error; }
+            const object = await github.rest.git.createTag({...params, tag,
+              message: JSON.stringify(report, null, 2), object: context.sha, type: 'commit'});
+            await github.rest.git.createRef({...params, ref: `refs/${ref}`, sha: object.data.sha});
