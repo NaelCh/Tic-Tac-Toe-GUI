@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import font as tkfont, messagebox
 
 from engine import Match, choose_move, winning_line
+from controls import cell_for_key
 from sounds import SoundPlayer
 from version import VERSION
 from ui import ActionButton, BoardCell, ScoreCard, rounded, BG, PANEL, TEXT, MUTED, TEAL, CORAL, PURPLE
@@ -278,8 +279,9 @@ class TicTacToe(tk.Tk):
         self._reset_session()
 
     def _key_move(self, event):
-        if event.char and event.char in '123456789':
-            self.handle_click(int(event.char)-1)
+        cell = cell_for_key(event.char, event.keysym)
+        if cell is not None:
+            self.handle_click(cell)
 
     def show_help(self):
         popup = tk.Toplevel(self)
@@ -299,7 +301,8 @@ class TicTacToe(tk.Tk):
             'Μέτριο  /  Βλέπει απειλές, αλλά αφήνει ανοίγματα.\n'
             'Δύσκολο  /  Σκέφτεται στρατηγικά, αλλά μπορείς να το κερδίσεις.\n'
             'Αήττητο  /  Το καλύτερο δυνατό αποτέλεσμα είναι ισοπαλία.\n\n'
-            '1–9: κίνηση, από πάνω αριστερά προς κάτω δεξιά.\n'
+            'Αριθμητικό πληκτρολόγιο (Num Lock ενεργό):\n'
+            '7 8 9: πάνω σειρά · 4 5 6: μέση σειρά · 1 2 3: κάτω σειρά.\n'
             'Tab και Space/Enter: επιλογή και ενεργοποίηση κουμπιών.\n'
             'Ctrl+N: νέος γύρος. F1: βοήθεια.\n\n'
             'Ήχοι: κουμπί πάνω δεξιά ή F2 για σίγαση/ενεργοποίηση.\n\n'

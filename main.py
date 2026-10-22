@@ -17,9 +17,14 @@ def smoke_test(report_path):
         app = TicTacToe()
         app.sounds.set_enabled(False)
         app.update()
-        for cell in (0, 3, 1, 4, 2):
-            app.buttons[cell].invoke()
+        app.focus_force()
         app.update()
+        for key, cell, symbol in (('7', 0, 'X'), ('4', 3, 'O'), ('8', 1, 'X'),
+                                  ('5', 4, 'O'), ('9', 2, 'X')):
+            # Tk's modifier bit 0x10 represents Num Lock for keypad digits.
+            app.event_generate(f'<KeyPress-KP_{key}>', state=0x10)
+            app.update()
+            assert app.match.board[cell] == symbol
         assert app.match.outcome == 'X' and app.scores['X'] == 1
         assert all(button['state'] == 'disabled' for button in app.buttons.values())
         assert sum(button.winning for button in app.buttons.values()) == 3
@@ -29,7 +34,7 @@ def smoke_test(report_path):
             with wave.open(str(app.sounds.asset_dir / f'{name}.wav'), 'rb') as sound:
                 assert sound.getnframes() > 0 and sound.getnchannels() == 1
         assert 'lose' in SOUND_NAMES
-        result.update(ok=True, sounds_bundled=True, loss_sound_bundled=True)
+        result.update(ok=True, sounds_bundled=True, loss_sound_bundled=True, keypad_verified=True)
     except Exception as error:
         result['error'] = f'{type(error).__name__}: {error}'
     finally:

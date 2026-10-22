@@ -1,5 +1,6 @@
 """Small, dependency-free canvas controls for the desktop interface."""
 import tkinter as tk
+from controls import CELL_KEYS
 
 BG = '#101321'
 PANEL = '#181c30'
@@ -136,7 +137,7 @@ class BoardCell(tk.Canvas):
         rounded(self, 3, 3, width-3, height-3, 22, fill=fill, outline=outline, width=2)
         symbol = self.symbol or (self.preview if hovered else '')
         if not symbol:
-            self.create_text(width-18, height-17, text=str(self.index+1),
+            self.create_text(width-18, height-17, text=CELL_KEYS[self.index],
                              fill='#737f9f', font=(self.family, 9))
             return
         color = TEAL if symbol == 'X' else CORAL

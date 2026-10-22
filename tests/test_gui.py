@@ -122,7 +122,32 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.app.match.board[1], 'O')
         self.app.event_generate('<KeyPress-3>')
         self.app.update()
-        self.assertEqual(self.app.match.board[2], 'X')
+        self.assertEqual(self.app.match.board[8], 'X')
+
+    def test_number_keys_follow_numeric_keypad_layout(self):
+        self.app.focus_force()
+        self.app.update()
+        for prefix in ('', 'KP_'):
+            for key, cell in (('7', 0), ('8', 1), ('9', 2), ('4', 3), ('5', 4),
+                              ('6', 5), ('1', 6), ('2', 7), ('3', 8)):
+                with self.subTest(key=prefix+key):
+                    self.app._reset_session()
+                    self.app.event_generate(f'<KeyPress-{prefix}{key}>', state=0x10)
+                    self.app.update()
+                    self.assertEqual(self.app.match.board[cell], 'X')
+                    self.assertEqual(self.app.match.board.count('X'), 1)
+
+    def test_empty_tiles_display_matching_numeric_keypad_labels(self):
+        # Read the actual canvas labels, including after a resize/reset redraw.
+        self.app.geometry('860x660')
+        self.app.update()
+        for cell, expected in enumerate(('7', '8', '9', '4', '5', '6', '1', '2', '3')):
+            tile = self.app.buttons[cell]
+            tile.hovered = False
+            tile.draw()
+            labels = [tile.itemcget(item, 'text') for item in tile.find_all()
+                      if tile.type(item) == 'text']
+            self.assertEqual(labels, [expected])
 
     def test_small_window_preserves_playable_board_and_controls(self):
         self.app.geometry('860x660')
