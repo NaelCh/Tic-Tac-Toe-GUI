@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101321">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Μια κίνηση ακόμα. Ελληνική τρίλιζα για δύο παίκτες ή με υπολογιστή, και χωρίς σύνδεση.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>Τρίλιζα · Μια κίνηση ακόμα</title>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <a class="brand" href="./" aria-label="Τρίλιζα, αρχική"><img src="./icons/icon-192.png" alt="" width="44" height="44"><span>Τρίλιζα<small>ΜΙΑ ΚΙΝΗΣΗ ΑΚΟΜΑ</small></span></a>
+      <button id="sound-toggle" class="icon-button" aria-pressed="true" aria-label="Σίγαση ήχου" title="Ήχος"><span aria-hidden="true">♫</span></button>
+    </header>
+
+    <section class="play-settings" aria-label="Τρόπος παιχνιδιού">
+      <div class="opponents" role="group" aria-label="Επίλεξε αντίπαλο">
+        <button data-opponent="computer" aria-pressed="true">Με υπολογιστή</button>
+        <button data-opponent="friend" aria-pressed="false">Με φίλο <span>δίπλα σου</span></button>
+      </div>
+      <div id="difficulty" class="difficulty" role="group" aria-label="Επίπεδο δυσκολίας">
+        <button data-level="easy" aria-pressed="false">Εύκολο</button>
+        <button data-level="medium" aria-pressed="true">Μέτριο</button>
+        <button data-level="hard" aria-pressed="false">Δύσκολο</button>
+        <button data-level="unbeatable" aria-pressed="false">Αήττητο</button>
+      </div>
+      <p id="mode-description" class="mode-description">Λίγη σκέψη, αρκετές ευκαιρίες.</p>
+    </section>
+
+    <section class="game" aria-label="Παιχνίδι τρίλιζας">
+      <div class="round-row"><span id="round-label">ΓΥΡΟΣ 01</span><span class="live-dot" id="connection-status">Για το μικρό σου διάλειμμα</span></div>
+      <h1 id="status" aria-live="polite" aria-atomic="true">Η σειρά σου.</h1>
+      <p id="status-detail">Πάτησε ένα κελί και φτιάξε τη δική σου τριάδα.</p>
+      <div class="scores" aria-label="Σκορ συνεδρίας">
+        <div class="score-card x"><span id="name-x">Εσύ · X</span><strong id="score-x">0</strong></div>
+        <div class="score-card draw"><span>Ισοπαλίες</span><strong id="score-draw">0</strong></div>
+        <div class="score-card o"><span id="name-o">Υπολογιστής · O</span><strong id="score-o">0</strong></div>
+      </div>
+      <div id="board" class="board" role="group" aria-label="Ταμπλό 3 επί 3">
+        <button class="cell" data-cell="0" aria-label="Κελί 7, πάνω αριστερά"><span class="key">7</span></button>
+        <button class="cell" data-cell="1" aria-label="Κελί 8, πάνω κέντρο"><span class="key">8</span></button>
+        <button class="cell" data-cell="2" aria-label="Κελί 9, πάνω δεξιά"><span class="key">9</span></button>
+        <button class="cell" data-cell="3" aria-label="Κελί 4, μέση αριστερά"><span class="key">4</span></button>
+        <button class="cell" data-cell="4" aria-label="Κελί 5, κέντρο"><span class="key">5</span></button>
+        <button class="cell" data-cell="5" aria-label="Κελί 6, μέση δεξιά"><span class="key">6</span></button>
+        <button class="cell" data-cell="6" aria-label="Κελί 1, κάτω αριστερά"><span class="key">1</span></button>
+        <button class="cell" data-cell="7" aria-label="Κελί 2, κάτω κέντρο"><span class="key">2</span></button>
+        <button class="cell" data-cell="8" aria-label="Κελί 3, κάτω δεξιά"><span class="key">3</span></button>
+      </div>
+      <button id="next-round" class="primary">Επόμενος γύρος <span aria-hidden="true">→</span></button>
+      <div class="game-links"><button id="help-button">Πώς παίζεται;</button><button id="reset-score">Μηδενισμός σκορ</button></div>
+    </section>
+
+    <section class="install-card" aria-label="Εγκατάσταση στο κινητό">
+      <div><strong>Το διάλειμμά σου, στο κινητό σου.</strong><p>Στην αρχική οθόνη. Και χωρίς σύνδεση.</p></div>
+      <button id="install-button">Εγκατάσταση <span aria-hidden="true">↗</span></button>
+    </section>
+    <div id="update-banner" class="update-banner" hidden><span>Υπάρχει νέα έκδοση.</span><button id="update-button">Ανανέωση</button></div>
+    <footer><span>ΧΩΡΙΣ ΔΙΑΦΗΜΙΣΕΙΣ · ΧΩΡΙΣ ΛΟΓΑΡΙΑΣΜΟΥΣ</span><button id="install-help">Οδηγίες εγκατάστασης</button><span class="version">Mobile 1.0.0</span></footer>
+  </main>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title"><form method="dialog"><span class="eyebrow">ΜΙΑ ΣΤΙΓΜΗ</span><h2 id="confirm-title">Να συνεχίσουμε;</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel">Ακύρωση</button><button value="confirm" class="primary">Συνέχεια</button></div></form></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><span class="eyebrow">ΟΙ ΚΑΝΟΝΕΣ ΕΙΝΑΙ ΑΠΛΟΙ</span><h2 id="help-title">Τρία στη σειρά.</h2><p>Φτιάξε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο. Αν γεμίσει το ταμπλό χωρίς νικητή, είναι ισοπαλία.</p><p>Με υπολογιστή είσαι X. Με φίλο μοιράζεστε την ίδια συσκευή. Ο πρώτος παίκτης αλλάζει σε κάθε γύρο.</p><ul><li><b>Εύκολο:</b> τυχαίες κινήσεις.</li><li><b>Μέτριο:</b> προσέχει, αλλά του ξεφεύγουν απειλές.</li><li><b>Δύσκολο:</b> σκέφτεται στρατηγικά, με ευκαιρίες για νίκη.</li><li><b>Αήττητο:</b> παίξε τέλεια για ισοπαλία.</li></ul><p>Οι ρυθμίσεις ήχου και δυσκολίας αποθηκεύονται στη συσκευή. Τα σκορ κρατούνται όσο είναι ανοιχτό το παιχνίδι.</p><p>Με πληκτρολόγιο: 7–8–9 πάνω, 4–5–6 στη μέση, 1–2–3 κάτω.</p><button class="primary full" data-close>Πάμε να παίξουμε →</button></dialog>
+  <dialog id="install-dialog" aria-labelledby="install-title"><span class="eyebrow">ΠΑΝΤΑ ΚΟΝΤΑ ΣΟΥ</span><h2 id="install-title">Βάλε την Τρίλιζα στο κινητό.</h2><h3>Android · Chrome</h3><p>Άνοιξε το μενού ⋮ και επίλεξε «Εγκατάσταση εφαρμογής» ή «Προσθήκη στην αρχική οθόνη».</p><h3>iPhone · Safari</h3><p>Άνοιξε την Κοινή χρήση <span aria-hidden="true">↥</span> και επίλεξε «Προσθήκη στην οθόνη Αφετηρίας».</p><p class="note">Άφησε την πρώτη φόρτωση να ολοκληρωθεί με σύνδεση στο διαδίκτυο. Μόλις εμφανιστεί «Έτοιμο για offline», μπορείς να παίζεις και χωρίς σύνδεση.</p><button class="primary full" data-close>Έγινε!</button></dialog>
+  <noscript>Για να παίξεις χρειάζεται ενεργή JavaScript στον browser.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

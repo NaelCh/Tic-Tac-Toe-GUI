@@ -1,0 +1,13 @@
+# Build tools only. Use the 64-bit official Python 3.7.9 distribution on Windows.
+# Keep this historical toolchain separate from the Windows 10/11 build.
+pip==23.3.2
+setuptools==44.1.1
+wheel==0.38.4
+pyinstaller==3.6
+altgraph==0.17.2
+pefile==2021.9.3
+pywin32-ctypes==0.2.0
+future==0.18.3
+importlib-metadata==4.13.0
+zipp==3.15.0
+typing-extensions==4.7.1

@@ -1,0 +1,289 @@
+name: Windows 7 Legacy installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'legacy-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Legacy candidate and test on current Windows
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.7.9'
+          architecture: 'x64'
+          cache: pip
+          cache-dependency-path: requirements-legacy-build.txt
+      - name: Check release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid VERSION' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "legacy-v$version") {
+            throw 'Legacy release tag must match VERSION'
+          }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Install pinned historical Python build tools
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'legacy-tools.log'
+          python -m pip install --upgrade pip==23.3.2 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned pip installation failed' }
+          python -m pip install --requirement requirements-legacy-build.txt 2>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Legacy build dependency installation failed' }
+          python --version 2>&1 | Tee-Object -FilePath $log -Append
+      - name: Run game, keyboard and audio tests with Python 3.7
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'legacy-tests.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Bundle Legacy Python, Tk and audio
+        shell: pwsh
+        run: |
+          python tools/build_legacy.py 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'legacy-build.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Download and verify Inno Setup 6.2.2 from its publisher
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'legacy-compiler.log'
+          $download = Join-Path $env:RUNNER_TEMP 'innosetup-6.2.2.exe'
+          $compilerDir = Join-Path $env:RUNNER_TEMP 'InnoSetup-6.2.2'
+          Invoke-WebRequest -Uri 'https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe' -OutFile $download
+          $signature = Get-AuthenticodeSignature -FilePath $download
+          "Authenticode status: $($signature.Status)" | Tee-Object -FilePath $log
+          if ($signature.Status -ne 'Valid' -or !$signature.SignerCertificate) {
+            throw 'The downloaded Inno compiler does not have a valid trusted signature'
+          }
+          $publisher = $signature.SignerCertificate.Subject
+          "Signer: $publisher" | Tee-Object -FilePath $log -Append
+          if ($publisher -notmatch '(^|,\s*)CN=Jordan Russell(,|$)') {
+            throw 'Unexpected Inno Setup signing publisher'
+          }
+          "Downloaded compiler SHA256: $((Get-FileHash $download -Algorithm SHA256).Hash.ToLower())" | Tee-Object -FilePath $log -Append
+          $setup = Start-Process $download -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$compilerDir`"") -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Inno Setup installation failed: $($setup.ExitCode)" }
+          $compiler = Join-Path $compilerDir 'ISCC.exe'
+          if (!(Test-Path $compiler)) { throw 'Pinned Inno Setup compiler is missing' }
+          $compilerVersion = (Get-Item $compiler).VersionInfo.ProductVersion
+          "Installed compiler version: $compilerVersion" | Tee-Object -FilePath $log -Append
+          if ($compilerVersion -notmatch '^6\.2\.2(\.|\s|$)') { throw 'Unexpected installed Inno Setup version' }
+          "LEGACY_ISCC=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Compile separate Windows 7 installer
+        shell: pwsh
+        run: |
+          & $env:LEGACY_ISCC "/DAppVersion=$env:APP_VERSION" installer\windows7.iss 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'legacy-installer.log')
+          $status = $LASTEXITCODE
+          if ($status -ne 0) { exit $status }
+      - name: Install, play and uninstall without Python on PATH
+        shell: pwsh
+        run: |
+          # This is a Windows Server 2022 smoke test, not a Windows 7 VM test.
+          $installer = (Resolve-Path "dist-legacy\Triliza-$env:APP_VERSION-Windows7-SP1-x64-Setup.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'TrilizaLegacy-installed'
+          $report = Join-Path $env:RUNNER_TEMP 'legacy-smoke.json'
+          $log = Join-Path $env:RUNNER_TEMP 'legacy-install.log'
+          $install = Start-Process $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installDir`"", "/LOG=`"$log`"") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Legacy install failed: $($install.ExitCode)" }
+          try {
+            $exe = Join-Path $installDir 'TrilizaLegacy.exe'
+            if (!(Test-Path $exe)) { throw 'Installed Legacy executable is missing' }
+            foreach ($notice in @('Python-LICENSE.txt', 'Tcl-LICENSE.txt', 'Tk-LICENSE.txt', 'PyInstaller-COPYING.txt')) {
+              if (!(Test-Path (Join-Path $installDir "licenses\$notice"))) { throw "Missing installed license: $notice" }
+            }
+            $oldPath = $env:PATH
+            try {
+              $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+              $app = Start-Process $exe -ArgumentList @('--smoke-test', '--report', "`"$report`"") -PassThru
+              if (!$app.WaitForExit(30000)) {
+                $app.Kill()
+                throw 'Legacy application smoke test timed out'
+              }
+              if ($app.ExitCode -ne 0) { throw "Installed Legacy app failed: $($app.ExitCode)" }
+            } finally {
+              $env:PATH = $oldPath
+            }
+            $result = Get-Content $report -Raw | ConvertFrom-Json
+            if (!$result.ok -or !$result.frozen -or !$result.sounds_bundled -or !$result.loss_sound_bundled -or !$result.keypad_verified -or $result.version -ne $env:APP_VERSION) {
+              throw "Invalid Legacy smoke-test report: $(Get-Content $report -Raw)"
+            }
+          } finally {
+            $uninstaller = Join-Path $installDir 'unins000.exe'
+            if (!(Test-Path $uninstaller)) { throw 'Legacy uninstaller is missing' }
+            $uninstall = Start-Process $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+            if ($uninstall.ExitCode -ne 0) { throw "Legacy uninstall failed: $($uninstall.ExitCode)" }
+            if (Test-Path (Join-Path $installDir 'TrilizaLegacy.exe')) { throw 'Legacy uninstall left the executable behind' }
+          }
+      - name: Generate installer checksum
+        shell: pwsh
+        run: |
+          $file = Get-Item "dist-legacy\Triliza-$env:APP_VERSION-Windows7-SP1-x64-Setup.exe"
+          $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($file.Name)" | Set-Content "$($file.FullName).sha256" -Encoding ascii
+      - name: Upload Legacy candidate tested on current Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows7-Legacy-Installer
+          path: |
+            dist-legacy/Triliza-*-Windows7-SP1-x64-Setup.exe
+            dist-legacy/Triliza-*-Windows7-SP1-x64-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Legacy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows7-Legacy-Diagnostics
+          path: |
+            ${{ runner.temp }}/legacy-*.log
+            ${{ runner.temp }}/legacy-smoke.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish experimental Legacy installer
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/legacy-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows7-Legacy-Installer
+          path: release-files
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cat > legacy-release-notes.md <<'NOTES'
+          Separate experimental installer targeting Windows 7 SP1 x64. No Python installation is required.
+
+          Built with Python 3.7.9, PyInstaller 3.6 and Inno Setup 6.2.2. Automated installation, keypad/game/audio smoke testing and uninstall passed on Windows Server 2022. Actual Windows 7 hardware/VM testing is still required; this prerelease is not a certification of Windows 7 compatibility. See LEGACY.md for requirements and the test checklist.
+
+          Download the Windows7-SP1-x64-Setup.exe installer. The companion .sha256 file contains its SHA256 checksum. This edition installs separately from the Windows 10/11 game.
+          NOTES
+          gh release create "$RELEASE_TAG" release-files/* \
+            --verify-tag --prerelease --title "Τρίλιζα Legacy ${RELEASE_TAG#legacy-v} — Windows 7 candidate" \
+            --notes-file legacy-release-notes.md
+      - name: Record immutable Legacy build receipt
+        env:
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          installers = list(Path('release-files').glob('*-Windows7-SP1-x64-Setup.exe'))
+          assert len(installers) == 1, installers
+          installer = installers[0]
+          checksum = hashlib.sha256(installer.read_bytes()).hexdigest()
+          expected = Path(str(installer) + '.sha256').read_text().split()[0]
+          assert checksum == expected, 'Downloaded Legacy installer checksum mismatch'
+          tag = os.environ['RELEASE_TAG']
+          receipt = {
+              'version': tag.removeprefix('legacy-v'),
+              'verified': True,
+              'windows7_runtime_verified': False,
+              'validation_os': 'Windows Server 2022 GitHub hosted runner',
+              'target_os': 'Windows 7 SP1 x64',
+              'python': '3.7.9',
+              'pyinstaller': '3.6',
+              'inno_setup': '6.2.2',
+              'keypad_verified': True,
+              'release_url': f"https://github.com/{os.environ['GH_REPO']}/releases/tag/{tag}",
+              'installer': installer.name,
+              'sha256': checksum,
+          }
+          Path('windows7-installer-receipt.json').write_text(
+              json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+          PYTHON
+          receipt_tag="windows7-installer/$RELEASE_TAG"
+          existing="$(git ls-remote --tags origin "refs/tags/$receipt_tag")"
+          if [ -n "$existing" ]; then
+            echo 'Refusing to overwrite an existing Legacy installer receipt.' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$receipt_tag" "$GITHUB_SHA" -F windows7-installer-receipt.json
+          git push origin "refs/tags/$receipt_tag"
+
+  failure-report:
+    name: Record bounded Legacy failure diagnostics
+    needs: [build, release]
+    if: always() && (needs.build.result == 'failure' || needs.release.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: Windows7-Legacy-Diagnostics
+          path: failure-logs
+      - name: Record Legacy failure receipt
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+
+          names = ('legacy-tools.log', 'legacy-tests.log', 'legacy-build.log',
+                   'legacy-compiler.log', 'legacy-installer.log', 'legacy-install.log')
+          tails = {}
+          for name in names:
+              path = Path('failure-logs') / name
+              if path.is_file():
+                  with path.open('rb') as stream:
+                      stream.seek(max(0, path.stat().st_size - 16000))
+                      log = stream.read(16000).decode('utf-8', errors='replace')
+                  tails[name] = '\n'.join(log.splitlines()[-50:])[-12000:]
+          report = {
+              'verified': False,
+              'windows7_runtime_verified': False,
+              'tag': os.environ['RELEASE_TAG'],
+              'build_result': os.environ['BUILD_RESULT'],
+              'release_result': os.environ['RELEASE_RESULT'],
+              'run_url': os.environ['RUN_URL'],
+              'log_tails': tails,
+          }
+          Path('windows7-installer-error.json').write_text(
+              json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          PYTHON
+          if [[ "$GITHUB_REF" == refs/tags/legacy-v* ]]; then
+            error_tag="windows7-installer-error/$RELEASE_TAG"
+          else
+            error_tag="windows7-installer-error/run-$GITHUB_RUN_ID"
+          fi
+          existing="$(git ls-remote --tags origin "refs/tags/$error_tag")"
+          if [ -n "$existing" ]; then
+            echo 'An immutable Legacy failure receipt already exists; leaving it unchanged.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$error_tag" "$GITHUB_SHA" -F windows7-installer-error.json
+          git push origin "refs/tags/$error_tag"
