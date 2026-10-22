@@ -21,8 +21,11 @@ def smoke_test(report_path):
         app.update()
         for key, cell, symbol in (('7', 0, 'X'), ('4', 3, 'O'), ('8', 1, 'X'),
                                   ('5', 4, 'O'), ('9', 2, 'X')):
-            # Tk's modifier bit 0x10 represents Num Lock for keypad digits.
-            app.event_generate(f'<KeyPress-KP_{key}>', state=0x10)
+            # Windows uses native VK_NUMPAD codes; X11 uses KP keysyms.
+            if sys.platform == 'win32':
+                app.event_generate('<KeyPress>', keycode=0x60+int(key), state=0x10)
+            else:
+                app.event_generate(f'<KeyPress-KP_{key}>', state=0x10)
             app.update()
             assert app.match.board[cell] == symbol
         assert app.match.outcome == 'X' and app.scores['X'] == 1

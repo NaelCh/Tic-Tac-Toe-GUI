@@ -1,4 +1,4 @@
-# Τρίλιζα · 1.3.2
+# Τρίλιζα · 1.3.3
 
 Εφαρμογή για υπολογιστή με ελληνικό περιβάλλον. Δύο παίκτες στον ίδιο υπολογιστή
 ή αντίπαλος με τέσσερα επίπεδα: εύκολο, μέτριο, δύσκολο και αήττητο.
@@ -17,7 +17,7 @@
 ## Εγκατάσταση Windows — χωρίς Python
 
 1. Άνοιξε τις [εκδόσεις του παιχνιδιού](https://github.com/NaelCh/Tic-Tac-Toe-GUI/releases/latest).
-2. Από τα Assets κατέβασε το `Triliza-1.3.2-Windows-Setup.exe`.
+2. Από τα Assets κατέβασε το `Triliza-1.3.3-Windows-Setup.exe`.
 3. Άνοιξε τον εγκαταστάτη και επίλεξε Install.
 4. Παίξε από τη συντόμευση «Τρίλιζα» στο μενού Έναρξη.
 
@@ -121,7 +121,7 @@ xvfb-run -a python -m unittest discover -s tests -v
 παρτίδα με συμβάντα αριθμητικού πληκτρολογίου στο εγκατεστημένο εκτελέσιμο.
 
 Για επόμενη έκδοση, άλλαξε το `VERSION`, κάνε commit/push και δημιούργησε το
-αντίστοιχο tag, π.χ. `v1.3.2`. Το tag πρέπει να συμφωνεί ακριβώς με το VERSION.
+αντίστοιχο tag, π.χ. `v1.3.3`. Το tag πρέπει να συμφωνεί ακριβώς με το VERSION.
 Χειροκίνητη εκτέλεση από το Actions δημιουργεί downloadable artifact χωρίς Release.
 
 Στο λειτουργικό σύστημα προορισμού, με Python/Tkinter:
@@ -135,7 +135,7 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-build.txt
 .venv\Scripts\python tools\build.py
 # Windows: μετά το build, με Inno Setup 6:
-ISCC.exe /DAppVersion=1.3.2 installer\windows.iss
+ISCC.exe /DAppVersion=1.3.3 installer\windows.iss
 ```
 
 Παραδίδεις ολόκληρο τον φάκελο `dist/Triliza`, μαζί με το `_internal`.

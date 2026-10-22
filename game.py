@@ -279,7 +279,7 @@ class TicTacToe(tk.Tk):
         self._reset_session()
 
     def _key_move(self, event):
-        cell = cell_for_key(event.char, event.keysym)
+        cell = cell_for_key(event.char, event.keysym, event.keycode)
         if cell is not None:
             self.handle_click(cell)
 

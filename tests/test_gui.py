@@ -1,5 +1,6 @@
 """Integration tests: require a real or virtual X display on Linux."""
 import time
+import sys
 import unittest
 from unittest.mock import patch
 from engine import Match
@@ -127,14 +128,20 @@ class DesktopTests(unittest.TestCase):
     def test_number_keys_follow_numeric_keypad_layout(self):
         self.app.focus_force()
         self.app.update()
+        observed = []
+        self.app.bind('<KeyPress>', lambda event: observed.append(
+            (event.char, event.keysym, event.keycode, event.state)), add='+')
         for prefix in ('', 'KP_'):
             for key, cell in (('7', 0), ('8', 1), ('9', 2), ('4', 3), ('5', 4),
                               ('6', 5), ('1', 6), ('2', 7), ('3', 8)):
                 with self.subTest(key=prefix+key):
                     self.app._reset_session()
-                    self.app.event_generate(f'<KeyPress-{prefix}{key}>', state=0x10)
+                    if prefix and sys.platform == 'win32':
+                        self.app.event_generate('<KeyPress>', keycode=0x60+int(key), state=0x10)
+                    else:
+                        self.app.event_generate(f'<KeyPress-{prefix}{key}>', state=0x10)
                     self.app.update()
-                    self.assertEqual(self.app.match.board[cell], 'X')
+                    self.assertEqual(self.app.match.board[cell], 'X', observed[-1:])
                     self.assertEqual(self.app.match.board.count('X'), 1)
 
     def test_empty_tiles_display_matching_numeric_keypad_labels(self):

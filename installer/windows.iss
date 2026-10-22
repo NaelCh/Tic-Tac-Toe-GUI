@@ -1,5 +1,5 @@
 ﻿; Build from the repository root with:
-; ISCC.exe /DAppVersion=1.3.2 installer\windows.iss
+; ISCC.exe /DAppVersion=1.3.3 installer\windows.iss
 ; AppVersion is supplied from VERSION by the release workflow.
 #ifndef AppVersion
   #error AppVersion must be supplied from VERSION using /DAppVersion
