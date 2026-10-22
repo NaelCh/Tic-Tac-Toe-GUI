@@ -106,14 +106,18 @@ class MobileBrowserTests(unittest.TestCase):
             "return button && (button.getAttribute('aria-pressed') === 'true' "
             "|| button.classList.contains('selected')); }", arg=selector)
 
-    def test_phone_sizes_and_visible_keypad_labels(self):
+    def test_phone_sizes_and_empty_cells_without_number_hints(self):
         for width, height in ((390, 844), (320, 568), (812, 375)):
             with self.subTest(width=width, height=height):
                 self.page.set_viewport_size({'width': width, 'height': height})
                 self.page.wait_for_function(
                     'document.documentElement.scrollWidth <= window.innerWidth + 1')
-                for index, label in enumerate(('7', '8', '9', '4', '5', '6', '1', '2', '3')):
-                    expect(self.cell(index)).to_contain_text(label)
+                expect(self.page.locator('#board button[data-symbol]')).to_have_count(0)
+                for index in range(9):
+                    expect(self.cell(index)).to_have_text('')
+                    label = self.cell(index).get_attribute('aria-label') or ''
+                    self.assertIn('κενό', label)
+                    self.assertNotRegex(label, r'\d')
                     bounds = self.cell(index).bounding_box()
                     self.assertIsNotNone(bounds)
                     self.assertGreaterEqual(bounds['width'], 44)

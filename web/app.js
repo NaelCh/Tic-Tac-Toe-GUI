@@ -100,12 +100,12 @@ function render() {
         button.innerHTML = symbol === 'X' ? xSvg : oSvg;
       } else {
         delete button.dataset.symbol;
-        button.innerHTML = `<span class="key">${KEYS[index]}</span>`;
+        button.innerHTML = '';
       }
     }
     button.classList.toggle('winning', line.includes(index));
     button.disabled = Boolean(symbol || result || computerTurn());
-    button.setAttribute('aria-label', `Κελί ${KEYS[index]}, ${POSITIONS[index]}, ${symbol || 'κενό'}`);
+    button.setAttribute('aria-label', `${POSITIONS[index]}, ${symbol || 'κενό'}`);
   });
   $('#name-x').textContent = isComputer() ? 'Εσύ · X' : 'Παίκτης X';
   $('#name-o').textContent = isComputer() ? 'Υπολογιστής · O' : 'Παίκτης O';

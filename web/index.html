@@ -45,15 +45,15 @@
         <div class="score-card o"><span id="name-o">Υπολογιστής · O</span><strong id="score-o">0</strong></div>
       </div>
       <div id="board" class="board" role="group" aria-label="Ταμπλό 3 επί 3">
-        <button class="cell" data-cell="0" aria-label="Κελί 7, πάνω αριστερά"><span class="key">7</span></button>
-        <button class="cell" data-cell="1" aria-label="Κελί 8, πάνω κέντρο"><span class="key">8</span></button>
-        <button class="cell" data-cell="2" aria-label="Κελί 9, πάνω δεξιά"><span class="key">9</span></button>
-        <button class="cell" data-cell="3" aria-label="Κελί 4, μέση αριστερά"><span class="key">4</span></button>
-        <button class="cell" data-cell="4" aria-label="Κελί 5, κέντρο"><span class="key">5</span></button>
-        <button class="cell" data-cell="5" aria-label="Κελί 6, μέση δεξιά"><span class="key">6</span></button>
-        <button class="cell" data-cell="6" aria-label="Κελί 1, κάτω αριστερά"><span class="key">1</span></button>
-        <button class="cell" data-cell="7" aria-label="Κελί 2, κάτω κέντρο"><span class="key">2</span></button>
-        <button class="cell" data-cell="8" aria-label="Κελί 3, κάτω δεξιά"><span class="key">3</span></button>
+        <button class="cell" data-cell="0" aria-label="πάνω αριστερά, κενό"></button>
+        <button class="cell" data-cell="1" aria-label="πάνω κέντρο, κενό"></button>
+        <button class="cell" data-cell="2" aria-label="πάνω δεξιά, κενό"></button>
+        <button class="cell" data-cell="3" aria-label="μέση αριστερά, κενό"></button>
+        <button class="cell" data-cell="4" aria-label="κέντρο, κενό"></button>
+        <button class="cell" data-cell="5" aria-label="μέση δεξιά, κενό"></button>
+        <button class="cell" data-cell="6" aria-label="κάτω αριστερά, κενό"></button>
+        <button class="cell" data-cell="7" aria-label="κάτω κέντρο, κενό"></button>
+        <button class="cell" data-cell="8" aria-label="κάτω δεξιά, κενό"></button>
       </div>
       <button id="next-round" class="primary">Επόμενος γύρος <span aria-hidden="true">→</span></button>
       <div class="game-links"><button id="help-button">Πώς παίζεται;</button><button id="reset-score">Μηδενισμός σκορ</button></div>
@@ -64,11 +64,11 @@
       <button id="install-button">Εγκατάσταση <span aria-hidden="true">↗</span></button>
     </section>
     <div id="update-banner" class="update-banner" hidden><span>Υπάρχει νέα έκδοση.</span><button id="update-button">Ανανέωση</button></div>
-    <footer><span>ΧΩΡΙΣ ΔΙΑΦΗΜΙΣΕΙΣ · ΧΩΡΙΣ ΛΟΓΑΡΙΑΣΜΟΥΣ</span><button id="install-help">Οδηγίες εγκατάστασης</button><span class="version">Mobile 1.0.0</span></footer>
+    <footer><span>ΧΩΡΙΣ ΔΙΑΦΗΜΙΣΕΙΣ · ΧΩΡΙΣ ΛΟΓΑΡΙΑΣΜΟΥΣ</span><button id="install-help">Οδηγίες εγκατάστασης</button><span class="version">Mobile 1.0.1</span></footer>
   </main>
 
   <dialog id="confirm-dialog" aria-labelledby="confirm-title"><form method="dialog"><span class="eyebrow">ΜΙΑ ΣΤΙΓΜΗ</span><h2 id="confirm-title">Να συνεχίσουμε;</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel">Ακύρωση</button><button value="confirm" class="primary">Συνέχεια</button></div></form></dialog>
-  <dialog id="help-dialog" aria-labelledby="help-title"><span class="eyebrow">ΟΙ ΚΑΝΟΝΕΣ ΕΙΝΑΙ ΑΠΛΟΙ</span><h2 id="help-title">Τρία στη σειρά.</h2><p>Φτιάξε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο. Αν γεμίσει το ταμπλό χωρίς νικητή, είναι ισοπαλία.</p><p>Με υπολογιστή είσαι X. Με φίλο μοιράζεστε την ίδια συσκευή. Ο πρώτος παίκτης αλλάζει σε κάθε γύρο.</p><ul><li><b>Εύκολο:</b> τυχαίες κινήσεις.</li><li><b>Μέτριο:</b> προσέχει, αλλά του ξεφεύγουν απειλές.</li><li><b>Δύσκολο:</b> σκέφτεται στρατηγικά, με ευκαιρίες για νίκη.</li><li><b>Αήττητο:</b> παίξε τέλεια για ισοπαλία.</li></ul><p>Οι ρυθμίσεις ήχου και δυσκολίας αποθηκεύονται στη συσκευή. Τα σκορ κρατούνται όσο είναι ανοιχτό το παιχνίδι.</p><p>Με πληκτρολόγιο: 7–8–9 πάνω, 4–5–6 στη μέση, 1–2–3 κάτω.</p><button class="primary full" data-close>Πάμε να παίξουμε →</button></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><span class="eyebrow">ΟΙ ΚΑΝΟΝΕΣ ΕΙΝΑΙ ΑΠΛΟΙ</span><h2 id="help-title">Τρία στη σειρά.</h2><p>Φτιάξε τρία ίδια σύμβολα σε γραμμή, στήλη ή διαγώνιο. Αν γεμίσει το ταμπλό χωρίς νικητή, είναι ισοπαλία.</p><p>Με υπολογιστή είσαι X. Με φίλο μοιράζεστε την ίδια συσκευή. Ο πρώτος παίκτης αλλάζει σε κάθε γύρο.</p><ul><li><b>Εύκολο:</b> τυχαίες κινήσεις.</li><li><b>Μέτριο:</b> προσέχει, αλλά του ξεφεύγουν απειλές.</li><li><b>Δύσκολο:</b> σκέφτεται στρατηγικά, με ευκαιρίες για νίκη.</li><li><b>Αήττητο:</b> παίξε τέλεια για ισοπαλία.</li></ul><p>Οι ρυθμίσεις ήχου και δυσκολίας αποθηκεύονται στη συσκευή. Τα σκορ κρατούνται όσο είναι ανοιχτό το παιχνίδι.</p><button class="primary full" data-close>Πάμε να παίξουμε →</button></dialog>
   <dialog id="install-dialog" aria-labelledby="install-title"><span class="eyebrow">ΠΑΝΤΑ ΚΟΝΤΑ ΣΟΥ</span><h2 id="install-title">Βάλε την Τρίλιζα στο κινητό.</h2><h3>Android · Chrome</h3><p>Άνοιξε το μενού ⋮ και επίλεξε «Εγκατάσταση εφαρμογής» ή «Προσθήκη στην αρχική οθόνη».</p><h3>iPhone · Safari</h3><p>Άνοιξε την Κοινή χρήση <span aria-hidden="true">↥</span> και επίλεξε «Προσθήκη στην οθόνη Αφετηρίας».</p><p class="note">Άφησε την πρώτη φόρτωση να ολοκληρωθεί με σύνδεση στο διαδίκτυο. Μόλις εμφανιστεί «Έτοιμο για offline», μπορείς να παίζεις και χωρίς σύνδεση.</p><button class="primary full" data-close>Έγινε!</button></dialog>
   <noscript>Για να παίξεις χρειάζεται ενεργή JavaScript στον browser.</noscript>
   <script type="module" src="./app.js"></script>
