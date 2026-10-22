@@ -121,8 +121,10 @@ jobs:
             } catch (error) {
               report.ok = false;
               report.status = error.status || null;
-              report.error = error.message;
-              core.setFailed(error.message);
+              report.error = error.status === 403
+                ? `GitHub Pages is not accessible to this workflow. In https://github.com/${context.repo.owner}/${context.repo.repo}/settings/pages select Source: GitHub Actions, then run this workflow again. Original error: ${error.message}`
+                : error.message;
+              core.setFailed(report.error);
             } finally {
               fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'mobile-pages-configuration.json'), JSON.stringify(report, null, 2));
             }
