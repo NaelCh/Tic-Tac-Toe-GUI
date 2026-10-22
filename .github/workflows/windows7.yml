@@ -74,7 +74,10 @@ jobs:
           }
           $publisher = $signature.SignerCertificate.Subject
           "Signer: $publisher" | Tee-Object -FilePath $log -Append
-          if ($publisher -notmatch '(^|,\s*)CN=Jordan Russell(,|$)') {
+          $signerName = $signature.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          "Signer simple name: $signerName" | Tee-Object -FilePath $log -Append
+          # This official 6.2.2 release is signed by Inno Setup coauthor Laan.
+          if ($signerName -ne 'Open Source Developer, Martijn Laan') {
             throw 'Unexpected Inno Setup signing publisher'
           }
           "Downloaded compiler SHA256: $((Get-FileHash $download -Algorithm SHA256).Hash.ToLower())" | Tee-Object -FilePath $log -Append
