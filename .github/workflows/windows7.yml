@@ -59,9 +59,16 @@ jobs:
           $log = Join-Path $env:RUNNER_TEMP 'legacy-compiler.log'
           $download = Join-Path $env:RUNNER_TEMP 'innosetup-6.2.2.exe'
           $compilerDir = Join-Path $env:RUNNER_TEMP 'InnoSetup-6.2.2'
-          Invoke-WebRequest -Uri 'https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe' -OutFile $download
+          $compilerUrl = 'https://github.com/jrsoftware/issrc/releases/download/is-6_2_2/innosetup-6.2.2.exe'
+          "Pinned compiler download: $compilerUrl" | Tee-Object -FilePath $log
+          try {
+            Invoke-WebRequest -Uri $compilerUrl -OutFile $download
+          } catch {
+            "Compiler download failed: $($_.Exception.Message)" | Tee-Object -FilePath $log -Append
+            throw
+          }
           $signature = Get-AuthenticodeSignature -FilePath $download
-          "Authenticode status: $($signature.Status)" | Tee-Object -FilePath $log
+          "Authenticode status: $($signature.Status)" | Tee-Object -FilePath $log -Append
           if ($signature.Status -ne 'Valid' -or !$signature.SignerCertificate) {
             throw 'The downloaded Inno compiler does not have a valid trusted signature'
           }
@@ -183,7 +190,12 @@ jobs:
         env:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          # The contents token can tag the current default-branch workflow tree.
+          # Record the actual build source independently if that branch moved.
+          git fetch --depth=1 --no-tags origin "refs/heads/$DEFAULT_BRANCH"
+          export RECEIPT_TARGET="$(git rev-parse FETCH_HEAD)"
           python3 - <<'PYTHON'
           import hashlib
           import json
@@ -201,6 +213,8 @@ jobs:
           receipt = {
               'version': version,
               'release_tag': tag,
+              'source_commit': os.environ['GITHUB_SHA'],
+              'receipt_target_commit': os.environ['RECEIPT_TARGET'],
               'verified': True,
               'windows7_runtime_verified': False,
               'validation_os': 'Windows Server 2022 GitHub hosted runner',
@@ -224,7 +238,7 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a "$receipt_tag" "$GITHUB_SHA" -F windows7-installer-receipt.json
+          git tag -a "$receipt_tag" "$RECEIPT_TARGET" -F windows7-installer-receipt.json
           git push origin "refs/tags/$receipt_tag"
 
   failure-report:
@@ -248,7 +262,10 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
           RELEASE_RESULT: ${{ needs.release.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          git fetch --depth=1 --no-tags origin "refs/heads/$DEFAULT_BRANCH"
+          export RECEIPT_TARGET="$(git rev-parse FETCH_HEAD)"
           python3 - <<'PYTHON'
           import json
           import os
@@ -268,6 +285,8 @@ jobs:
               'verified': False,
               'windows7_runtime_verified': False,
               'tag': os.environ['RELEASE_TAG'],
+              'source_commit': os.environ['GITHUB_SHA'],
+              'receipt_target_commit': os.environ['RECEIPT_TARGET'],
               'build_result': os.environ['BUILD_RESULT'],
               'release_result': os.environ['RELEASE_RESULT'],
               'run_url': os.environ['RUN_URL'],
@@ -288,5 +307,5 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a "$error_tag" "$GITHUB_SHA" -F windows7-installer-error.json
+          git tag -a "$error_tag" "$RECEIPT_TARGET" -F windows7-installer-error.json
           git push origin "refs/tags/$error_tag"

@@ -6,10 +6,6 @@ on:
       run_id:
         description: Windows Legacy workflow run to inspect
         required: true
-        default: '39829056541'
-  push:
-    branches: [master]
-    paths: ['.github/workflows/legacy-diagnostics.yml']
 
 permissions:
   actions: read
@@ -23,7 +19,7 @@ jobs:
       - name: Record bounded failed-job logs without exposing credentials
         uses: actions/github-script@v7
         env:
-          DIAGNOSTIC_RUN_ID: ${{ inputs.run_id || '39829056541' }}
+          DIAGNOSTIC_RUN_ID: ${{ inputs.run_id }}
         with:
           script: |
             const params = {owner: context.repo.owner, repo: context.repo.repo};

@@ -8,7 +8,7 @@ on a current computer. No separate repository is needed.
 ## Download and install
 
 Open the repository's **Releases** page and select the prerelease whose tag is
-`legacy-v1.3.3-r2` (or a newer `legacy-v…` tag). Download
+`legacy-v1.3.3-r3` (or a newer `legacy-v…` tag). Download
 `Triliza-1.3.3-Windows7-SP1-x64-Setup.exe`, run it, then open **Τρίλιζα Legacy**
 from the Start menu. A release is published only after the installer passes
 the automated Windows build, installation, game smoke test and removal checks.
@@ -64,7 +64,8 @@ python tools/build_legacy.py
 
 The output directory is `dist-legacy`; the main build's `dist` is untouched.
 Always read the current `VERSION` instead of reusing the example version.
-The workflow downloads the pinned Inno installer from the official publisher
+The workflow downloads the pinned Inno installer from the publisher's official
+GitHub release
 and requires a valid Authenticode signature from **Jordan Russell** before
 running it. It also records the downloaded compiler's SHA256. Signature
 verification is never disabled to work around an unavailable download.
@@ -79,6 +80,9 @@ a companion `.sha256` checksum. Successful publication also creates an
 immutable `windows7-installer/<release-tag>` Git receipt that explicitly
 records `windows7_runtime_verified: false`; failure diagnostics use
 `windows7-installer-error/<release-tag>`.
+Receipts record the build's source commit explicitly and attach to the current
+default-branch commit, allowing a contents-only Actions token to publish them
+even after newer workflow files have been committed.
 
 Upstream compatibility references:
 
