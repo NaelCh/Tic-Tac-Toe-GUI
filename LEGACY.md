@@ -8,7 +8,7 @@ on a current computer. No separate repository is needed.
 ## Download and install
 
 Open the repository's **Releases** page and select the prerelease whose tag is
-`legacy-v1.3.3-r4` (or a newer `legacy-v…` tag). Download
+`legacy-v1.3.3-r5` (or a newer `legacy-v…` tag). Download
 `Triliza-1.3.3-Windows7-SP1-x64-Setup.exe`, run it, then open **Τρίλιζα Legacy**
 from the Start menu. A release is published only after the installer passes
 the automated Windows build, installation, game smoke test and removal checks.
@@ -68,7 +68,11 @@ The workflow downloads the pinned Inno installer from the publisher's official
 GitHub release
 and requires a valid Authenticode signature from this release's signer,
 **Open Source Developer, Martijn Laan** (Inno Setup's coauthor), before
-running it. It also records the downloaded compiler's SHA256. Signature
+running it. It pins the downloaded installer's SHA256 to
+`8117d10d00a2ad33a1390978ea3872861c330e087914410a6377b22c4c5b8563`
+(the official asset whose trusted signature was verified during CI). Actual
+compilation must report compiler engine version 6.2.2; the compiler executable's
+generic PE ProductVersion is not used as its version. Signature
 verification is never disabled to work around an unavailable download.
 
 The **Windows 7 Legacy installer** workflow can be run manually to produce

@@ -67,6 +67,11 @@ jobs:
             "Compiler download failed: $($_.Exception.Message)" | Tee-Object -FilePath $log -Append
             throw
           }
+          $compilerHash = (Get-FileHash $download -Algorithm SHA256).Hash.ToLower()
+          "Downloaded compiler SHA256: $compilerHash" | Tee-Object -FilePath $log -Append
+          if ($compilerHash -ne '8117d10d00a2ad33a1390978ea3872861c330e087914410a6377b22c4c5b8563') {
+            throw 'Pinned official Inno Setup installer checksum mismatch'
+          }
           $signature = Get-AuthenticodeSignature -FilePath $download
           "Authenticode status: $($signature.Status)" | Tee-Object -FilePath $log -Append
           if ($signature.Status -ne 'Valid' -or !$signature.SignerCertificate) {
@@ -80,21 +85,24 @@ jobs:
           if ($signerName -ne 'Open Source Developer, Martijn Laan') {
             throw 'Unexpected Inno Setup signing publisher'
           }
-          "Downloaded compiler SHA256: $((Get-FileHash $download -Algorithm SHA256).Hash.ToLower())" | Tee-Object -FilePath $log -Append
           $setup = Start-Process $download -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$compilerDir`"") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Inno Setup installation failed: $($setup.ExitCode)" }
           $compiler = Join-Path $compilerDir 'ISCC.exe'
           if (!(Test-Path $compiler)) { throw 'Pinned Inno Setup compiler is missing' }
-          $compilerVersion = (Get-Item $compiler).VersionInfo.ProductVersion
-          "Installed compiler version: $compilerVersion" | Tee-Object -FilePath $log -Append
-          if ($compilerVersion -notmatch '^6\.2\.2(\.|\s|$)') { throw 'Unexpected installed Inno Setup version' }
           "LEGACY_ISCC=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Compile separate Windows 7 installer
         shell: pwsh
         run: |
-          & $env:LEGACY_ISCC "/DAppVersion=$env:APP_VERSION" installer\windows7.iss 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'legacy-installer.log')
+          $log = Join-Path $env:RUNNER_TEMP 'legacy-installer.log'
+          & $env:LEGACY_ISCC "/DAppVersion=$env:APP_VERSION" installer\windows7.iss 2>&1 | Tee-Object -FilePath $log
           $status = $LASTEXITCODE
           if ($status -ne 0) { exit $status }
+          # ISCC.exe has an uninformative PE ProductVersion of 0.0.0.0.
+          # Its real compilation reports the actual loaded compiler engine.
+          $output = Get-Content $log -Raw
+          if ($output -notmatch '(?m)^Compiler engine version:.*(?<![\d.])6\.2\.2(?![\d.])') {
+            throw 'Unexpected Inno Setup compiler engine version in compilation log'
+          }
       - name: Install, play and uninstall without Python on PATH
         shell: pwsh
         run: |
